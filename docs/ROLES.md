@@ -4,6 +4,8 @@
 >
 > **개발 마감: 10/2(금) 점심** · **발표: 10/2 14:00–16:30, 조별 20분 이내**
 > 결과물은 하나의 파이프라인입니다 (가이드 p.5). 예측은 LSTM 1개(시계열)만, 생성형 AI 는 예측에 끼지 않고 이력을 읽어 보고서만 만듭니다.
+>
+> **서비스 범위 = 농수산물 시세 예보, 구현 · 발표 품목 = 토마토.** 품목은 사계절용 / 계절용 두 그룹으로 나누고 설정값(`config/items.yaml`)으로 바꿉니다 — 아래 0-1.
 
 ---
 
@@ -35,6 +37,23 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 ---
 
+## 0-1. 서비스 범위와 품목 그룹 (교수님 피드백 10/1)
+
+| 그룹 | 기준 | 품목 | 이번 구현 |
+|---|---|---|---|
+| **사계절용** | 연중 출하 — 20거래일 연속 시퀀스가 끊기지 않는다 | **토마토** · 토마토 완숙 · 방울토마토 | **토마토 1개 모델** (학습 · 서빙 · 드리프트 · 재학습 · 보고서 전부) |
+| **계절용** | 출하 철에만 거래 — 철마다 새로 시작하는 짧은 시계열 | 토마토 대저 · 딸기 | 설계 · 발표로만 |
+
+**코드를 쓸 때 지킬 것 — "토마토 전용"이 아니라 "품목 하나"로 쓴다**
+- 품목 이름 · 데이터 경로 · 모델 이름은 `config/items.yaml` 에서 온다. 새로 쓰는 코드에 `"토마토"` `"Tomato"` 를 박아 넣지 않는다
+- 데이터는 `data/<품목 키>_prices.csv`, 모델 이름은 `<품목>_Price_Predictor` — 품목을 늘릴 때 코드는 그대로, 설정 · 파일만 늘어난다
+- 화면 · 보고서 · 로그 문구는 `{품목명} 시세` 꼴로 (예: 토마토 시세 급변 감지)
+- 기존 스켈레톤의 HAIC 상수는 3장 공유 상수 PR 로 한 번에 바꾼다. 스켈레톤 전체를 설정 기반으로 다시 짜는 건 하지 않는다 (마감 · "복잡하게 하지 말 것")
+
+**발표에서 그룹을 보여 주는 방법**: `config/items.yaml` 표 → 토마토가 사계절용 대표로 끝까지 도는 데모 → "같은 설정으로 완숙 · 방울토마토는 바로, 계절용은 철 단위 시퀀스로" 확장 경로 한 장.
+
+---
+
 ## 1. 누가 무엇을
 
 | | 이름 | 역할 | 소유 파일 | 내 AIOps 신호 | 기획서 · 발표 |
@@ -46,7 +65,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 공용 (바꾸기 전에 슬랙): `.github/` · `.env.example` · `docs/` · `README.md` · `scripts/check_constants.py`
 
-**하지 않는 것** (발표에서는 설계로만): 그룹별 모델 여러 개 실제 학습 — 구현은 토마토 1개 · LLM 이 예측값을 고치거나 RAG 를 붙이는 것.
+**하지 않는 것** (발표에서는 설계로만): 그룹 · 품목별 모델 여러 개 실제 학습 — 구현은 사계절용 토마토 1개 · 계절용 그룹 파이프라인 구현 · LLM 이 예측값을 고치거나 RAG 를 붙이는 것.
 
 ---
 
@@ -59,7 +78,8 @@ docker compose -f serving_app/docker-compose.yml up --build
 | KAMIS 가락시장 토마토(등급 "상") 3년치 → `Date,Close,Volume` CSV. 휴장일 빼고 거래일로 이어 붙이기 | `scripts/fetch_kamis.py` → `data/tomato_prices.csv` | 기획서 3-5 |
 | 반입량 — 서울시농수산식품공사 OpenAPI 승인 대기. 늦으면 KAMIS 소매가격을 보조 피처로 (열 이름은 그대로 Volume) | 같은 스크립트 | 3-5 |
 | 단순 예측(내일 = 오늘) RMSE 재확인 → **임계값 제안** (기획서: 612원/kg 미만) → 슬랙 공지 | baseline 결과 | ② 품질 · 3-1 |
-| 품목 그룹표 · 기본 품목 토마토 | `config/items.yaml` (뼈대 있음) | 「품목 그룹」 |
+| 품목 그룹표 확정 — 사계절용 · 계절용 기준(거래일 수 · 공백 기간)과 품목별 거래일 수 확인, 후보 품목 추가 · `status` 갱신 | `config/items.yaml` (기획서 표 옮겨 둠) | 「품목 그룹」 |
+| 발표용 그룹 근거 — 품목별 3년 거래일 수 · 최대 공백 표 (예: 토마토 908일 · 대저 288일) | 표 · 캡처 | 「품목 그룹」 |
 | 보고서 프롬프트 — 점주 · 본사가 읽을 문장, 드리프트 시 "신뢰도 낮음" 규칙 | `report_sidecar/prompts/report.md` (뼈대 있음) | ② GET /report |
 | (선택) 입력 분포 PSI > 0.2 | 새 파일 | 3-2 |
 
@@ -82,7 +102,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 | 할 일 | 파일 | 근거 |
 |---|---|---|
-| 모델 이름 `HAIC_Predictor` → `Tomato_Price_Predictor` (공유 상수 — 3장) | `train_and_register.py` · `model_loader.py`(B 리뷰) · `retrain_trigger.py` 로그 문구(D 리뷰) | 「품목 그룹」 |
+| 모델 이름 `HAIC_Predictor` → `Tomato_Price_Predictor` — 규칙 `<품목>_Price_Predictor`, `config/items.yaml` 의 `model_name` 과 같게 (공유 상수 — 3장) | `train_and_register.py` · `model_loader.py`(B 리뷰) · `retrain_trigger.py` 로그 문구(D 리뷰) | 「품목 그룹」 |
 | 게이트 임계값 원/kg (공유 상수) | `train_and_register.py` | 3-1 |
 | Dockerfile 시드 CSV 를 토마토로 교체 | `Dockerfile` | 6장 주의 |
 | 사이드카 컨테이너를 compose 에 추가 · API 키는 `env_file: .env` · `logs/` `outputs/` 볼륨 공유 | `docker-compose.yml` · `report_sidecar/Dockerfile` | 7장 |
@@ -100,7 +120,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | 승격 시 판정 윈도우 초기화 (팀 결정) | `retrain_trigger.py` | 3-4 #7 |
 | 지연 > 500ms · 에러율 > 5% → `aiops.log` 경고 (B 의 집계 함수 사용) | `monitoring/` | 3-2 |
 | LLM 관측 — 생성 실패 · 30초 초과 · 드리프트인데 "신뢰도 낮음" 누락 → 경고 | `report_sidecar/observe.py` (뼈대 있음) | 3-2 |
-| 대시보드 문구 HAIC → 토마토 시세 예보 | `index.html` | 6장 |
+| 대시보드 문구 HAIC → "농수산물 시세 예보 · 토마토" (서비스명 + 현재 품목) | `index.html` | 6장 · 「품목 그룹」 |
 | (선택) 재학습을 BackgroundTasks 로 분리 또는 한계로 명시 | `retrain_trigger.py` · `routers/predict.py`(B 리뷰) | 3-4 #8 |
 
 **먼저 할 것**: 시나리오 함수에 기준 가격 · 변동성을 인자로 빼 두기 → A 의 CSV 가 오면 값만 바꾸면 되게.
@@ -111,15 +131,15 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 **한 사람이 정해 공지하고, 표의 위치를 한 PR 에서 전부 바꿉니다.** `python3 scripts/check_constants.py` 가 CI 에서 일치 여부를 검사합니다 (✔ 표시).
 
-| 상수 | 지금 (HAIC) | 토마토 | 정하는 사람 | 위치 |
+| 상수 | 지금 (HAIC) | 구현 품목 (토마토) | 정하는 사람 | 위치 |
 |---|---|---|---|---|
 | 입력 길이 `SEQ_LEN` ✔ | 20 | 20 (그대로) | — | `data/features.py:16` · `index.html` `const SEQ_LEN` |
 | 판정 윈도우 `WINDOW_SIZE` ✔ | 21 | 21 (그대로) | — | `monitoring/drift_detector.py:23` · `index.html` `const WINDOW_SIZE` · `simulate_drift.py` `BATCH_N = 41` (= 20 + 21) |
 | RMSE 임계값 ✔ | 4.00 ($) | **팀 결정** (< 612원/kg) | A 제안 → 전원 합의 | `train_and_register.py:37` `RMSE_GATE` · `drift_detector.py:22` `RMSE_THRESHOLD` · `index.html` `const RMSE_THRESHOLD` |
-| 모델 이름 ✔ | `HAIC_Predictor` | `Tomato_Price_Predictor` | C | `train_and_register.py:38` · `model_loader.py:40` `MLFLOW_MODEL_URI` · `retrain_trigger.py:90` 로그 문구 |
+| 모델 이름 ✔ | `HAIC_Predictor` | `Tomato_Price_Predictor` (= `items.yaml` `model_name`) | C | `train_and_register.py:38` · `model_loader.py:40` `MLFLOW_MODEL_URI` · `retrain_trigger.py:90` 로그 문구 |
 | 시나리오 기준 가격 | 165.0 | 3,727 (3년 평균) | A 데이터로 D 가 | `simulate_drift.py:75,80` `base=` · `index.html` `DEFAULT_BASE_PRICE` |
 | 변동성 | 0.012 / ×3 | **팀 결정** (토마토 일변동) | A 데이터로 D 가 | `simulate_drift.py:66-67` · `index.html` `NORMAL_SIGMA` `DRIFT_SIGMA` |
-| 시드 CSV | `sample_haic_prices.csv` | `tomato_prices.csv` | A 파일 · C 교체 | `Dockerfile:28` · `simulate_drift.py:42` `SAMPLE_CSV` · 안내 문구(`storage.py` · `index.html`) |
+| 시드 CSV | `sample_haic_prices.csv` | `tomato_prices.csv` (= `items.yaml` `data`) ✅ 커밋됨, Volume 열 대기 | A 파일 · C 교체 | `Dockerfile:28` · `simulate_drift.py:42` `SAMPLE_CSV` · 안내 문구(`storage.py` · `index.html`) |
 | 열 · 필드 이름 | `Close` / `Volume` | **팀 결정** — 수준 1(그대로, 의미만 재정의) / 수준 2(이름까지) | 전원 | CSV · `features.py` · `schemas.py` · `routers/data.py` · `model_loader.py` · `routers/predict.py` |
 
 > 대시보드(`index.html`)는 서버 상수를 복사해 씁니다. 서버만 고치면 대시보드 버튼은 예전 값으로 돕니다.
@@ -188,3 +208,5 @@ C 모델 이름 변경 ──▶ (B model_loader 리뷰 · D retrain_trigger 문
 - [ ] LLM 호출 방식 — 외부 API(키 · 비용 담당자) / 로컬 ollama(이미지 커짐)
 - [ ] 승격 시 판정 윈도우 초기화 · 이전 버전 Archived · 회귀 테스트 구현 범위
 - [ ] 반입량 API 승인 안 되면 소매가격으로 갈지, 시점은 언제 결정할지
+- [ ] 계절용 그룹 설계 — 철 시작 후 20거래일 전에는 예측을 안 할지 / 지난 철 마지막 가중치에서 시작할지 (발표 설명용)
+- [ ] 사계절용 다른 품목(완숙 · 방울토마토)을 발표 전에 데이터만이라도 보여 줄지

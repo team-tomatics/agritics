@@ -23,6 +23,7 @@
 - [ ] `serving_app/schemas.py` `model_loader.py` `main.py` `history_log.py` &nbsp;/&nbsp; `routers/predict.py` `health.py` `report.py` &nbsp;/&nbsp; `report_sidecar/generator.py` — **B** 박유진
 - [ ] `serving_app/train_and_register.py` `lstm_model.py` `Dockerfile` `docker-compose.yml` &nbsp;/&nbsp; `requirements.txt` &nbsp;/&nbsp; `report_sidecar/Dockerfile` — **C** 황재원
 - [ ] `serving_app/monitoring/` &nbsp;/&nbsp; `scripts/simulate_drift.py` &nbsp;/&nbsp; `serving_app/static/index.html` &nbsp;/&nbsp; `routers/logs.py` &nbsp;/&nbsp; `report_sidecar/observe.py` — **D** 민영은
+- [ ] `config/items.yaml` (품목 · 그룹) ← 체크되면 모델 이름 · 데이터 경로가 3장 공유 상수와 같은지 확인
 - [ ] **공유 상수** (입력 길이 · 윈도우 · 임계값 · 기준 가격 · 모델 이름 · 열 이름) ← 체크되면 **ROLES.md 3장 위치를 전부 고쳤는지 확인하고 슬랙에 알리세요**
 - [ ] `logs/history.jsonl` 한 줄 형식 ← 체크되면 B · D 둘 다 리뷰
 - [ ] `.github/` &nbsp;/&nbsp; `.env.example` &nbsp;/&nbsp; `docs/` &nbsp;/&nbsp; `README.md` (공용)
@@ -66,4 +67,5 @@
 - [ ] API 키를 코드에 직접 적지 않았습니다. (`.env`)
 - [ ] `mlflow.db`, `mlruns/`, `*.keras`, `scaler.pkl`, `data/uploads/`, `logs/`, `.env` 를 커밋하지 않았습니다.
 - [ ] LLM 이 예측값을 만들거나 고치지 않습니다. (숫자는 로그 값 그대로)
+- [ ] 새 코드에 품목 이름(토마토)을 박아 넣지 않았습니다. (`config/items.yaml` 또는 공유 상수)
 - [ ] 남의 파일을 고치지 않았습니다.

@@ -10,6 +10,7 @@ body:
       label: 종류
       options:
         - "공유 상수 변경 (입력 길이 · 윈도우 · 임계값 · 기준 가격 · 모델 이름 · 열 이름)"
+        - "품목 · 그룹 (config/items.yaml — 품목 추가 · 사계절용 / 계절용 기준)"
         - "설정 · CI · 의존성 (requirements / .env.example / workflows)"
         - "문서 (README / CONTRIBUTING / ROLES)"
         - "기획 변경 (기획서와 코드가 어긋남)"

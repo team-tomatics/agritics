@@ -17,6 +17,19 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 품목 범위
+      description: "서비스는 농수산물 전체, 구현은 토마토. 대부분은 '전 품목 공통'이어야 합니다 (docs/ROLES.md 0-1)"
+      options:
+        - "전 품목 공통 (품목은 config/items.yaml 에서)"
+        - "사계절용 그룹"
+        - "계절용 그룹 (설계 · 발표용)"
+        - "토마토 전용 (데이터 · 임계값 등 값만)"
+    validations:
+      required: true
+
   - type: textarea
     id: about
     attributes:
@@ -48,6 +61,7 @@ body:
         - [ ] 공유 상수(입력 길이 · 윈도우 · 임계값 · 기준 가격 · 모델 이름)를 바꿨다면 docs/ROLES.md 3장의 모든 위치를 같이 고침
         - [ ] (컨테이너 영향 시) `docker compose -f serving_app/docker-compose.yml up --build` 통과
         - [ ] 발표 ⑥ 에 쓸 캡처 · 로그를 PR 에 첨부
+        - [ ] 새 코드에 품목 이름(토마토)을 박아 넣지 않음 — config/items.yaml 또는 공유 상수
         - [ ] 남의 파일을 건드리지 않음
 
   - type: input

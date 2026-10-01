@@ -50,7 +50,7 @@ DEFAULT_PROMPT = """너는 외식 프랜차이즈 가맹점주와 본사 구매 
 - 변화율: {change_pct}
 - 예측 모델 버전: {model_version}
 - 최근 24시간 드리프트 감지: {drift_count}회 · 재학습 승격: {promotions}
-- 최근 24시간 요청 {request_count}건 · 평균 응답 {avg_latency_ms} · 서버 에러율 {error_rate}
+- 최근 24시간 예측 요청 {request_count}건 · 예측 평균 응답 {avg_latency_ms} · 서버 에러율 {error_rate}
 """
 
 
@@ -170,7 +170,7 @@ def template_report(facts: dict, reason: str) -> str:
         f"- 내일 예측가: **{facts['predicted_price']}** (오늘 {facts['last_price']}, {facts['change_pct']})",
         f"- 예측 모델: {facts['model_version']}",
         f"- 최근 24시간 드리프트 감지 {facts['drift_count']}회 · 재학습 승격: {facts['promotions']}",
-        f"- 서비스 상태: 요청 {facts['request_count']}건 · 평균 응답 {facts['avg_latency_ms']} · 서버 에러율 {facts['error_rate']}",
+        f"- 서비스 상태: 예측 요청 {facts['request_count']}건 · 평균 응답 {facts['avg_latency_ms']} · 서버 에러율 {facts['error_rate']}",
         "",
         f"> 자동 문장 생성에 실패해 정해진 양식으로 만든 보고서입니다 ({reason}). 숫자는 같은 기록에서 나왔습니다.",
     ]

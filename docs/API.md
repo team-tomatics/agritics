@@ -85,14 +85,18 @@
 ## GET /metrics?minutes=5
 
 `logs/history.jsonl` 최근 N분 집계 (기본 5분, 0 < N ≤ 1440 — `minutes=0` 은 422).
+지연 · 에러율은 **`POST /predict` 만으로** 계산한다 — batch-test 는 안에서 재학습(약 8초)이 돌아 섞으면 가짜 지연 경고가 난다 (#25).
 ```json
-{"window_min": 5.0, "count": 5, "avg_latency_ms": 1102.1, "p95_latency_ms": 5470.7,
- "error_rate": 0.2, "client_error_rate": 0.2,
- "limits": {"avg_latency_ms": 500, "error_rate": 0.05},
- "alerts": ["avg_latency_ms", "error_rate"]}
+{"window_min": 60.0, "target": "/predict", "count": 2, "avg_latency_ms": 129.0, "p95_latency_ms": 200.7,
+ "error_rate": 0.0, "client_error_rate": 0.0,
+ "total_count": 4, "by_path": {"/predict": 2, "/predict/batch-test": 2},
+ "limits": {"avg_latency_ms": 500, "error_rate": 0.05}, "alerts": []}
 ```
+(10/1 실측: `/predict` 2회 + batch-test 정상 1 · 드리프트 1. batch-test 지연 313ms · **7,554ms(재학습)** 는 계산에서 빠짐 — 고치기 전엔 같은 시나리오에서 평균 2,054ms · 지연 경고)
 | 필드 | 뜻 |
 |---|---|
+| `count` · 지연 · 에러율 | `target`(`/predict`) 요청만 |
+| `total_count` · `by_path` | 기록된 전체 요청 (batch-test · report 포함) |
 | `error_rate` | 5xx 비율 (서버가 응답을 못 준 것) |
 | `client_error_rate` | 4xx 비율 (422 · 404 — 잘못된 요청) |
 | `alerts` | 기획서 3-2 임계값(평균 > 500ms · 에러율 > 5%)을 넘은 지표 이름 |

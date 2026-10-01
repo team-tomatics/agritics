@@ -107,7 +107,7 @@ def _load_from_mlflow() -> LoadedModel:
     확인 방법
       1) python serving_app/train_and_register.py   → "[GATE PASSED] ... promoted to Production"
       2) MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8077
-      3) /predict 응답의 model_version 이 "production" 이고 predicted_close 가 달러 값이면 성공
+      3) /predict 응답의 model_version 이 "production-vN" 이고 predicted_close 가 달러 값이면 성공
     """
     import mlflow.tensorflow
 
@@ -123,7 +123,22 @@ def _load_from_mlflow() -> LoadedModel:
     #     · Day2 모델은 어떤 스케일러로 0~1 변환한 데이터로 학습했나요? (train_and_register.py 의 SCALER_PATH 참고)
     #     · 스케일러를 여기서 새로 fit 하면 어떤 일이 생길까요?
     scaler = HAICScaler.load(SCALER_PATH)
-    return LoadedModel(keras_model=keras_model, scaler=scaler, version="production")
+    # 팀: 응답 · 이력 로그 · 보고서에서 재학습 후 버전 전환이 보이도록 실제 번호를 붙인다 (예: "production-v3")
+    return LoadedModel(keras_model=keras_model, scaler=scaler, version=_production_version_label())
+
+
+def _production_version_label() -> str:
+    """MLFLOW_MODEL_URI 의 모델에서 Production 단계 중 가장 높은 버전 번호. 조회 실패해도 예측은 계속한다."""
+    try:
+        from mlflow.tracking import MlflowClient
+
+        name = MLFLOW_MODEL_URI.split("/")[1]  # "models:/<이름>/Production"
+        versions = [int(v.version) for v in MlflowClient().search_model_versions(f"name='{name}'")
+                    if v.current_stage == "Production"]
+        return f"production-v{max(versions)}" if versions else "production"
+    except Exception as e:  # noqa: BLE001
+        print(f"[mlflow] 버전 번호 조회 실패 - 'production' 으로 표시: {e}")
+        return "production"
 
 
 def _load_model() -> LoadedModel:

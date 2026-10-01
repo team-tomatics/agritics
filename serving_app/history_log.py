@@ -6,7 +6,7 @@
 
 한 줄 형식 (D 모니터링 · report_sidecar 가 이 키를 읽는다 — 바꾸면 B · D 둘 다 리뷰):
     {"ts": "2026-10-01T16:00:00+09:00", "method": "POST", "path": "/predict", "status": 200,
-     "latency_ms": 23.4, "model_version": "production", "predicted": 3812.5,
+     "latency_ms": 23.4, "model_version": "production-v3", "predicted": 3812.5,
      "input_last": {"close": 3750.0, "volume": 120}}
 
 - model_version · predicted · input_last 는 라우터가 request.state.history 에 넣어 준 경우만 있다

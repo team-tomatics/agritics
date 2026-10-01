@@ -31,6 +31,7 @@ SKALA 모델 서빙 및 AIOps 조별 미니프로젝트 (10반). 베이스는 �
 |---|---|
 | [docs/기획서.md](docs/기획서.md) | ① 이해관계자 가치 · ② 운영 목표 · ③ 게이트 · 모니터링 · 드리프트 대응 |
 | [docs/ROLES.md](docs/ROLES.md) | 역할 분담 · 공유 상수 위치 · 의존 그래프 · 초기 이슈 · 일정 |
+| [docs/API.md](docs/API.md) | ⑤ API 명세 · Lazy/Eager 응답 시간 측정 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 브랜치 · 커밋 · PR 규칙 |
 | [docs/skeleton_README.md](docs/skeleton_README.md) | 교수님 스켈레톤 원본 설명 |
 

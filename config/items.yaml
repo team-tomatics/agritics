@@ -7,6 +7,7 @@
 # 품목 하나 = 데이터 data/<key>_prices.csv + 모델 이름 <Name>_Price_Predictor (확장 시 규칙)
 # status: implemented(이번에 학습 · 서빙) / planned(데이터 확인됨, 설계만) / candidate(데이터 확인 필요)
 # auction_time: 가락시장 경매 시각 — 보고서 시각 = 경매 + report_lag_hours (토마토 02:00 → 06:00, #27)
+# evidence: 실제 확보한 데이터로 확인한 기간 · 거래일 · 공백 · 단위 (추정값을 적지 않음)
 
 report_lag_hours: 4
 
@@ -30,6 +31,16 @@ items:
     status: implemented
     data: data/tomato_prices.csv
     model_name: Tomato_Price_Predictor
+    evidence:
+      period_start: "2023-10-02"
+      period_end: "2026-09-30"
+      source_price_trading_days: 908
+      training_trading_days: 903
+      max_calendar_gap_days: 5
+      max_gap_period: "2025-10-04 ~ 2025-10-09"
+      price_unit: 원/kg
+      volume_unit: kg
+      excluded_missing_volume_days: 5
     note: KAMIS 가격 908거래일 중 일별 반입량과 결합 가능한 903거래일 학습 데이터 (2023-10-02 ~ 2026-09-30)
   - key: tomato_ripe
     name: 토마토 완숙

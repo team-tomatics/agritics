@@ -1,4 +1,4 @@
-# Day2: FastAPI 서빙 앱 컨테이너 (단일 서비스)
+# Day2: FastAPI 서빙 앱 컨테이너 + LLM 보고서 사이드카
 #
 # MLflow는 별도 서버 없이 이 컨테이너 안에서 로컬 sqlite로 트래킹합니다(Dockerfile 참고).
 # 이미지 빌드 시점에 샘플 데이터 시드 -> 베이스라인 학습 -> MLflow 등록까지 전부 끝나 있으므로,
@@ -19,3 +19,24 @@ services:
       context: ..
       dockerfile: serving_app/Dockerfile
     ports: ["8099:8099"]
+    volumes:
+      - logs:/app/logs          # history.jsonl · aiops.log — 사이드카가 읽는다
+      - outputs:/app/outputs    # outputs/reports/*.md — GET /report 가 읽는다
+
+  # 보고서 사이드카 (report_sidecar/Dockerfile). 예측 API 와 분리 — 죽어도 /predict 는 영향 없음.
+  # LLM 은 외부 API — 키는 프로젝트 루트 .env 의 LLM_* (없어도 serving-app 은 뜬다)
+  report-sidecar:
+    build:
+      context: ..
+      dockerfile: report_sidecar/Dockerfile
+    env_file:
+      - path: ../.env
+        required: false
+    volumes:
+      - logs:/app/logs          # 쓰기도 필요: observe.py 가 aiops.log 에 경고를 남긴다
+      - outputs:/app/outputs
+    depends_on: [serving-app]
+
+volumes:
+  logs:
+  outputs:

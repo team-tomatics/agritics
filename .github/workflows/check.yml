@@ -9,6 +9,16 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - name: 브랜치 이름 규칙 (<type>/<이슈번호>-<slug>, PR 만)
+        if: github.event_name == 'pull_request'
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          echo "branch=$BRANCH"
+          if ! echo "$BRANCH" | grep -qE '^(feat|fix|chore|docs|refactor|data)/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "::error::브랜치 이름이 규칙과 다릅니다: $BRANCH  →  예: feat/4-history-log (CONTRIBUTING 2장)"; exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - name: API 키 하드코딩 검사

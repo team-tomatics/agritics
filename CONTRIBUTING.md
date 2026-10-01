@@ -18,7 +18,7 @@
 ### 1회 설정 — 각자 자기 PC 에서 한 번만
 
 ```bash
-git clone https://github.com/dolmaroyujinpark/agritics.git
+git clone https://github.com/team-tomatics/agritics.git
 cd agritics
 python3.11 -m venv .venv
 .venv/bin/pip install -r requirements.txt     # tensorflow 포함이라 몇 분

@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: 브랜치 · 커밋 · PR 규칙
-    url: https://github.com/dolmaroyujinpark/agritics/blob/main/CONTRIBUTING.md
+    url: https://github.com/team-tomatics/agritics/blob/main/CONTRIBUTING.md
     about: 브랜치 네이밍, 커밋 컨벤션, PR/머지 규칙을 먼저 확인해주세요.
   - name: 역할 분담 · 의존 순서 · 공유 상수
-    url: https://github.com/dolmaroyujinpark/agritics/blob/main/docs/ROLES.md
+    url: https://github.com/team-tomatics/agritics/blob/main/docs/ROLES.md
     about: 누가 어느 파일을 맡는지, 무엇이 무엇을 기다리는지, 같이 바꿔야 하는 값.
   - name: 기획서
-    url: https://github.com/dolmaroyujinpark/agritics/blob/main/docs/기획서.md
+    url: https://github.com/team-tomatics/agritics/blob/main/docs/기획서.md
     about: 이해관계자 가치 · 운영 목표 · 게이트 · 모니터링 · 드리프트 대응. 이슈에는 절 번호로 근거를 답니다.

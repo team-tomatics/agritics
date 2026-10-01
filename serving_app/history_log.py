@@ -77,19 +77,33 @@ def read_entries(minutes: float | None = None, path: str = HISTORY_PATH, now: da
     return entries
 
 
-def summarize(minutes: float = 5, path: str = HISTORY_PATH, now: datetime | None = None) -> dict:
+METRIC_PATH = "/predict"  # 기획서 3-2 지연 · 에러율은 점주가 쓰는 예측 API 기준
+
+
+def summarize(minutes: float = 5, path: str = HISTORY_PATH, now: datetime | None = None,
+              target: str = METRIC_PATH) -> dict:
     """
     최근 minutes 분 집계 (기획서 3-2: 5분 집계). D 의 경고 판단과 GET /metrics 가 쓴다.
-    요청이 없으면 지연 · 에러율은 None (0 으로 두면 "정상"으로 오해한다).
+    - count · 지연 · 에러율은 target(기본 POST /predict) 만으로 계산한다.
+      /predict/batch-test 는 드리프트 시뮬레이션이라 안에서 재학습(약 8초)이 돌아 섞으면 가짜 지연 경고가 난다 (#25)
+    - total_count · by_path 로 전체 요청은 따로 본다
+    - 요청이 없으면 지연 · 에러율은 None (0 으로 두면 "정상"으로 오해한다)
     """
-    entries = read_entries(minutes, path, now)
+    all_entries = read_entries(minutes, path, now)
+    entries = [e for e in all_entries if e.get("path") == target]
+    by_path: dict[str, int] = {}
+    for e in all_entries:
+        by_path[e.get("path", "?")] = by_path.get(e.get("path", "?"), 0) + 1
     n = len(entries)
     latencies = sorted(e["latency_ms"] for e in entries)
     return {
         "window_min": minutes,
+        "target": target,
         "count": n,
         "avg_latency_ms": round(sum(latencies) / n, 1) if n else None,
         "p95_latency_ms": latencies[math.ceil(n * 0.95) - 1] if n else None,  # nearest-rank
         "error_rate": round(sum(e["status"] >= 500 for e in entries) / n, 3) if n else None,
         "client_error_rate": round(sum(400 <= e["status"] < 500 for e in entries) / n, 3) if n else None,
+        "total_count": len(all_entries),
+        "by_path": by_path,
     }

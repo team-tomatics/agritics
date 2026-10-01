@@ -3,6 +3,9 @@
 API 승인 전:
     python scripts/fetch_kamis.py analyze --prices data/tomato_prices.csv
 
+    현재 ``Volume=0``은 팀의 가격 단일 피처 모델을 먼저 열기 위한 임시값이다.
+    실측 반입량으로 오해하거나 최종 모델 성능 근거로 사용하지 않는다.
+
 반입량 CSV 확보 후:
     python scripts/fetch_kamis.py merge \
       --prices data/tomato_prices.csv \
@@ -12,7 +15,8 @@ API 승인 전:
       --output data/tomato_prices.csv
 
 실제 OpenAPI 호출은 승인 후 응답 필드와 단위를 확인한 다음 추가한다. 승인 전에는
-임의의 Volume 값을 본 데이터에 쓰지 않는다.
+0 이외의 임의값을 만들지 않는다. 실측 Volume을 넣은 뒤에는 기존 스케일러·모델을
+이어 쓰지 말고 스케일러를 다시 fit해 모델을 처음부터 학습·등록한다.
 """
 
 from __future__ import annotations
@@ -136,6 +140,27 @@ def close_statistics(prices: dict[date, float]) -> dict[str, float | int | str]:
     }
 
 
+def embedded_volume_status(csv_path: Path, *, date_column: str) -> tuple[str, int]:
+    """가격 CSV에 포함된 Volume이 임시 0인지 실측 후보 값인지 구분한다."""
+
+    with csv_path.open(encoding="utf-8-sig", newline="") as source:
+        reader = csv.DictReader(source)
+        if "Volume" not in set(reader.fieldnames or []):
+            return "missing", 0
+
+    volumes = read_daily_series(
+        csv_path,
+        date_column=date_column,
+        value_column="Volume",
+    )
+    zero_count = sum(value == 0 for value in volumes.values())
+    if zero_count == len(volumes):
+        return "placeholder-zero", zero_count
+    if zero_count:
+        return "mixed-with-zero", zero_count
+    return "populated", 0
+
+
 def print_statistics(stats: dict[str, float | int | str]) -> None:
     print(f"rows={stats['rows']}  period={stats['start']}..{stats['end']}")
     print(
@@ -223,8 +248,14 @@ def main() -> int:
         print_statistics(close_statistics(prices))
 
         if args.command == "analyze":
-            if args.prices == DEFAULT_PRICE_CSV:
-                print("status=price-ready, volume-pending (원본 CSV는 변경하지 않음)")
+            status, zero_count = embedded_volume_status(
+                args.prices, date_column=args.price_date_column
+            )
+            print(f"volume_status={status} zero_rows={zero_count}")
+            if status == "placeholder-zero":
+                print(
+                    "warning=Volume 0은 API 승인 전 임시값이며 실측 반입량이 아닙니다."
+                )
             return 0
 
         volumes = read_daily_series(

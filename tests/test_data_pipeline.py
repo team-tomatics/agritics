@@ -8,6 +8,7 @@ from pathlib import Path
 from data.validation import DataValidationError, parse_price_volume_csv
 from scripts.fetch_kamis import (
     close_statistics,
+    embedded_volume_status,
     merge_price_and_volume,
     read_daily_series,
     write_rows_atomic,
@@ -77,6 +78,13 @@ class FetchKamisTests(unittest.TestCase):
         self.assertEqual(stats["max_calendar_gap_days"], 5)
         self.assertAlmostEqual(stats["mean_close"], 3727.0638766519824)
         self.assertAlmostEqual(stats["naive_rmse"], 612.3640339153468)
+
+    def test_current_volume_is_explicitly_marked_as_placeholder(self):
+        status, zero_count = embedded_volume_status(
+            Path("data/tomato_prices.csv"), date_column="Date"
+        )
+        self.assertEqual(status, "placeholder-zero")
+        self.assertEqual(zero_count, 908)
 
 
 if __name__ == "__main__":

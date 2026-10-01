@@ -30,7 +30,7 @@ items:
     status: implemented
     data: data/tomato_prices.csv
     model_name: Tomato_Price_Predictor
-    note: KAMIS 가락시장 경락가 · 등급 상 · 908거래일 (2023-10-02 ~ 2026-09-30)
+    note: KAMIS 가격 908거래일 중 일별 반입량과 결합 가능한 903거래일 학습 데이터 (2023-10-02 ~ 2026-09-30)
   - key: tomato_ripe
     name: 토마토 완숙
     group: year_round

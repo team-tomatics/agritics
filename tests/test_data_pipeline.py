@@ -74,17 +74,17 @@ class FetchKamisTests(unittest.TestCase):
             Path("data/tomato_prices.csv"), date_column="Date", value_column="Close"
         )
         stats = close_statistics(prices)
-        self.assertEqual(stats["rows"], 908)
+        self.assertEqual(stats["rows"], 903)
         self.assertEqual(stats["max_calendar_gap_days"], 5)
-        self.assertAlmostEqual(stats["mean_close"], 3727.0638766519824)
-        self.assertAlmostEqual(stats["naive_rmse"], 612.3640339153468)
+        self.assertAlmostEqual(stats["mean_close"], 3722.8704318936875)
+        self.assertAlmostEqual(stats["naive_rmse"], 614.0589279232946)
 
-    def test_current_volume_is_explicitly_marked_as_placeholder(self):
+    def test_current_volume_is_populated(self):
         status, zero_count = embedded_volume_status(
             Path("data/tomato_prices.csv"), date_column="Date"
         )
-        self.assertEqual(status, "placeholder-zero")
-        self.assertEqual(zero_count, 908)
+        self.assertEqual(status, "populated")
+        self.assertEqual(zero_count, 0)
 
 
 if __name__ == "__main__":

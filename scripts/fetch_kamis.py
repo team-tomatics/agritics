@@ -1,12 +1,9 @@
 """KAMIS 토마토 가격을 점검하고 일별 반입량과 결합한다.
 
-API 승인 전:
+현재 데이터 점검:
     python scripts/fetch_kamis.py analyze --prices data/tomato_prices.csv
 
-    현재 ``Volume=0``은 팀의 가격 단일 피처 모델을 먼저 열기 위한 임시값이다.
-    실측 반입량으로 오해하거나 최종 모델 성능 근거로 사용하지 않는다.
-
-반입량 CSV 확보 후:
+반입량 CSV 교체 시:
     python scripts/fetch_kamis.py merge \
       --prices data/tomato_prices.csv \
       --volumes /path/to/volume.csv \
@@ -14,9 +11,8 @@ API 승인 전:
       --volume-column Volume \
       --output data/tomato_prices.csv
 
-실제 OpenAPI 호출은 승인 후 응답 필드와 단위를 확인한 다음 추가한다. 승인 전에는
-0 이외의 임의값을 만들지 않는다. 실측 Volume을 넣은 뒤에는 기존 스케일러·모델을
-이어 쓰지 말고 스케일러를 다시 fit해 모델을 처음부터 학습·등록한다.
+Volume 데이터가 바뀌면 기존 스케일러·모델을 이어 쓰지 말고 스케일러를 다시 fit해
+모델을 처음부터 학습·등록한다.
 """
 
 from __future__ import annotations

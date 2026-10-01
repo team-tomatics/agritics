@@ -104,7 +104,7 @@
 
 ## GET /report
 
-LLM 사이드카(`python -m report_sidecar.generator`)가 만든 최신 보고서. 서빙 프로세스는 LLM 을 부르지 않는다 (PR #16).
+LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06:00 KST**(토마토 02:00 경매 기준) · 사이드카 시작 시 만든 최신 보고서. 서빙 프로세스는 LLM 을 부르지 않는다 (PR #16).
 ```json
 {"date": "2026-10-01", "generated_at": "2026-10-01T16:53:11+09:00",
  "source": "template", "error": "HTTPError: 401 Client Error: Unauthorized for url: https://api.openai.com/v1/chat/completions",

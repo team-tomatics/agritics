@@ -177,6 +177,7 @@ PR 을 올리면 `검사` 가 자동으로 돕니다.
 
 | 검사 | 실패하면 |
 | --- | --- |
+| 브랜치 이름 `<type>/<이슈번호>-<slug>` (PR 만) | ❌ 실패 — 브랜치를 새 이름으로 다시 만들어 PR |
 | API 키 하드코딩 (`sk-`, `sk-ant-`, `..._KEY = "..."`) | ❌ 실패 — `.env` 로 옮기기 |
 | 커밋 금지 파일 (`.env`, `mlflow.db`, `mlruns/`, `*.keras`, `scaler.pkl`, `data/uploads/*.csv`, `logs/*`, `reference/`) | ❌ 실패 — `git rm --cached` |
 | `ruff check` (문법 오류 · 정의 안 된 이름만) | ❌ 실패 |

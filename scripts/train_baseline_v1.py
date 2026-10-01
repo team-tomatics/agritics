@@ -6,9 +6,10 @@
     python scripts/train_baseline_v1.py --csv data/tomato_prices.csv
 
 입력은 ``Date,Close,Volume`` 형식이며, 최근 25거래일의 가격(원/kg)과
-반입량(kg)으로 다음 거래일 가격을 예측한다. 생성되는 ``haic_v1.keras`` 파일명은
-기존 로컬 모델 로더와의 호환을 위해 유지한다. 정식 배포 게이트 검증과 MLflow
-등록은 ``serving_app/train_and_register.py``가 담당한다.
+반입량(kg)으로 다음 거래일 가격을 예측한다. 현재 생성되는 ``haic_v1.keras``는
+기존 로컬 모델 로더가 참조하는 임시 레거시 파일명이다. 토마토 모델명으로의 동시
+교체는 B 소유 로더와 함께 #56에서 처리한다. 정식 배포 게이트 검증과 MLflow 등록은
+``serving_app/train_and_register.py``가 담당한다.
 """
 import argparse
 import os
@@ -19,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.features import SEQ_LEN, HAICScaler, build_sequences, load_rows, train_test_split
 from data.storage import latest_upload
 
-MODEL_PATH = "serving_app/models/haic_v1.keras"
+MODEL_PATH = "serving_app/models/haic_v1.keras"  # TODO(#56): B 로더와 함께 tomato_v1로 변경
 SCALER_PATH = "serving_app/models/scaler.pkl"
 BASE_EPOCHS = 100  # 전체 문제를 100번 반복해서 학습
 SEED = 42

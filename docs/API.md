@@ -99,7 +99,7 @@
 | `total_count` · `by_path` | 기록된 전체 요청 (batch-test · report 포함) |
 | `error_rate` | 5xx 비율 (서버가 응답을 못 준 것) |
 | `client_error_rate` | 4xx 비율 (422 · 404 — 잘못된 요청) |
-| `alerts` | 기획서 3-2 임계값(평균 > 500ms · 에러율 > 5%)을 넘은 지표 이름 |
+| `alerts` | 기획서 3-2 임계값(**P95 > 500ms · 5xx 에러율 > 1%**)을 넘은 지표 이름 (#31) |
 | 요청 0건 | 지연 · 에러율 `null` (0 으로 두면 "정상"으로 오해) |
 
 ## GET /report

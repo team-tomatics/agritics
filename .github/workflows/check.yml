@@ -1,0 +1,36 @@
+name: 검사
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: API 키 하드코딩 검사
+        run: |
+          if grep -rnE "sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|(CERT_KEY|API_KEY)\s*=\s*['\"][A-Za-z0-9-]{16,}" \
+               --include='*.py' --include='*.md' --include='*.yaml' --include='*.yml' --include='*.json' --include='*.html' \
+               --exclude-dir=.git --exclude-dir=.venv . ; then
+            echo "::error::API 키가 코드에 들어 있습니다. .env 로 옮기세요."; exit 1
+          fi
+
+      - name: 커밋 금지 파일 검사
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.env$|^mlflow\.db$|^mlruns/|^mlartifacts/|\.keras$|scaler\.pkl$|^data/uploads/.+\.csv$|^logs/.+\.(log|jsonl)$|^reference/' || true)
+          if [ -n "$bad" ]; then echo "::error::커밋하면 안 되는 파일: $bad"; exit 1; fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 스켈레톤 원본 스타일을 강제하지 않도록 문법 오류 · 정의 안 된 이름만 잡는다
+      - name: 문법 검사 (ruff — 오류만)
+        run: pipx run ruff check --select E9,F63,F7,F82 .
+
+      - name: 공유 상수 일치 검사 (docs/ROLES.md 3장 — 서버 · 대시보드 · 시뮬레이터)
+        run: python3 scripts/check_constants.py

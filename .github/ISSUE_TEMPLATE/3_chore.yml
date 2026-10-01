@@ -1,0 +1,47 @@
+name: "🔧 Chore"
+description: "설정 · CI · 의존성 · 문서 · 기획 변경 · 공유 상수 · 발표 준비"
+title: "[CHORE] "
+labels: ["chore"]
+
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 종류
+      options:
+        - "공유 상수 변경 (입력 길이 · 윈도우 · 임계값 · 기준 가격 · 모델 이름 · 열 이름)"
+        - "설정 · CI · 의존성 (requirements / .env.example / workflows)"
+        - "문서 (README / CONTRIBUTING / ROLES)"
+        - "기획 변경 (기획서와 코드가 어긋남)"
+        - "데이터 · 실측 (KAMIS 수집 · 단순 예측 RMSE · 지연 측정)"
+        - "발표 준비 (④ 아키텍처 · ⑤ API 명세 · ⑥ 화면 캡처)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: about
+    attributes:
+      label: 무엇을
+      description: |
+        공유 상수라면: 이름 / 지금 값 → 새 값 / 근거 (예: 단순 예측 RMSE 612원/kg)
+        기획 변경이라면: 어느 절 / 현재 기획 / 왜 바꿔야 하나 / 제안
+    validations:
+      required: true
+
+  - type: textarea
+    id: todo
+    attributes:
+      label: To Do
+      value: |
+        - [ ] Task 1
+        - [ ] Task 2
+
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: 영향 범위
+      options:
+        - label: "코드 수정 필요 (공유 상수면 docs/ROLES.md 3장 위치 전부)"
+        - label: "`docs/기획서.md` 수정 필요"
+        - label: "컨테이너 재빌드 필요"
+        - label: "조원 합의 필요 (기획은 조 전체가 정한 것이므로 혼자 바꾸지 않습니다)"

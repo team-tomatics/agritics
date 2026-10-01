@@ -1,0 +1,12 @@
+# [소유: A 데이터 · 심준용]  품목 그룹 (기획서 「품목 그룹」 표)
+# 구현은 사계절용 토마토 1개 모델. 그룹은 설정값 · 모델 이름으로 확장 경로만 보여 준다.
+default_item: tomato
+
+groups:
+  year_round:          # 사계절용 — 20거래일 연속 시퀀스가 끊기지 않는다
+    - {key: tomato, name: 토마토, model_name: Tomato_Price_Predictor}
+    - {key: tomato_ripe, name: 토마토 완숙}
+    - {key: cherry_tomato, name: 방울토마토}
+  seasonal:            # 계절용 — 출하 철에만 거래
+    - {key: tomato_daejeo, name: 토마토 대저}
+    - {key: strawberry, name: 딸기}

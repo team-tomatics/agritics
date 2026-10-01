@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.ruff_cache/
+
+# 가상환경 (교수님 스켈레톤 venv 이름 aiops 포함)
+.venv/
+aiops/
+
+# 환경변수 / API 키
+.env
+.env.*
+!.env.example
+
+# 강의자료 · 가이드 PDF (저작권)
+reference/
+
+# 학습 · 서빙 산출물 (재실행으로 재현 — 각자 PC 에서 생성)
+mlflow.db
+mlruns/
+mlartifacts/
+serving_app/models/*
+!serving_app/models/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+logs/*
+!logs/.gitkeep
+outputs/reports/*
+!outputs/reports/.gitkeep
+
+# 압축파일
+*.zip

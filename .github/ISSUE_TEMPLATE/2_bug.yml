@@ -1,0 +1,56 @@
+name: "🐛 Bug"
+description: "동작하지 않는 것"
+title: "[BUG] "
+labels: ["bug"]
+
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: 어느 파트
+      description: 소유자가 고칩니다. 남의 파일을 직접 고치지 마세요.
+      options:
+        - "A 데이터 (업로드 · CSV · features · baseline)"
+        - "B 서빙 (/predict · /health · /report · 모델 로드 · 이력 로그)"
+        - "C MLOps (게이트 · MLflow · Docker · compose)"
+        - "D 모니터링 (드리프트 · 재학습 · 대시보드 · LLM 관측)"
+        - "공용 (CI · .env · 문서)"
+        - "모르겠음"
+    validations:
+      required: true
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 증상
+      description: 무엇이 어떻게 안 되나요? (상태 코드 · 예측값 · 로그 한 줄)
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 재현 방법
+      value: |
+        1. 실행 위치: 로컬 uvicorn(8077) / 컨테이너(8099)
+        2. 명령 또는 요청:
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: 에러 로그
+      description: 트레이스백 (길면 마지막 20줄) · logs/aiops.log · docker compose 로그
+      render: shell
+
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: 확인한 것
+      options:
+        - label: "최신 `main` 에서도 재현됩니다"
+        - label: "프로젝트 루트에서 실행했습니다 (`serving_app/` 안이 아님)"
+        - label: "`train_baseline_v1.py` → `train_and_register.py` 를 먼저 돌려 MLflow 에 Production 이 있습니다"
+        - label: "재학습 후 값이 안 바뀌는 문제라면 서버 재시작 / 캐시 비우기를 확인했습니다"

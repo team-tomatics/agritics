@@ -10,8 +10,8 @@
 ## 0. 시작 5분 (전원)
 
 ```bash
-git clone https://github.com/dolmaroyujinpark/tomato-aiops.git
-cd tomato-aiops
+git clone https://github.com/dolmaroyujinpark/agritics.git
+cd agritics
 python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 

@@ -55,9 +55,9 @@ def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:
     return float(closes.mean()), float(closes.std())
 
 
-# SEQ_LEN(20) + WINDOW_SIZE(21) = 41개를 보내야 배치 하나당 정확히 WINDOW_SIZE(21)개의
+# SEQ_LEN(25) + WINDOW_SIZE(15) = 40개를 보내야 배치 하나당 정확히 WINDOW_SIZE(15)개의
 # (predicted, actual) 쌍이 쌓여, drift_detector.py가 바로 판정할 수 있다.
-BATCH_N = 41
+BATCH_N = 40
 
 # 학습 데이터(실제 IBM 시세 기반)는 추세·모멘텀이 있는 시계열이라, 평균 주변의 순수
 # 백색잡음(iid noise)을 넣으면 "정상" 입력조차 모델이 못 맞춰 오탐(false positive)이

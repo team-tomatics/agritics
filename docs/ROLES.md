@@ -41,7 +41,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 | 그룹 | 기준 | 품목 | 이번 구현 |
 |---|---|---|---|
-| **사계절용** | 연중 출하 — 20거래일 연속 시퀀스가 끊기지 않는다 | **토마토** · 토마토 완숙 · 방울토마토 | **토마토 1개 모델** (학습 · 서빙 · 드리프트 · 재학습 · 보고서 전부) |
+| **사계절용** | 연중 출하 — 25거래일(가락시장 한 달) 연속 시퀀스가 끊기지 않는다 | **토마토** · 토마토 완숙 · 방울토마토 | **토마토 1개 모델** (학습 · 서빙 · 드리프트 · 재학습 · 보고서 전부) |
 | **계절용** | 출하 철에만 거래 — 철마다 새로 시작하는 짧은 시계열 | 토마토 대저 · 딸기 | 설계 · 발표로만 |
 
 **기획은 범용, 구현은 토마토만**
@@ -133,8 +133,9 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 | 상수 | 지금 (HAIC) | 구현 품목 (토마토) | 정하는 사람 | 위치 |
 |---|---|---|---|---|
-| 입력 길이 `SEQ_LEN` ✔ | 20 | 20 (그대로) | — | `data/features.py:16` · `index.html` `const SEQ_LEN` |
-| 판정 윈도우 `WINDOW_SIZE` ✔ | 21 | 21 (그대로) | — | `monitoring/drift_detector.py:23` · `index.html` `const WINDOW_SIZE` · `simulate_drift.py` `BATCH_N = 41` (= 20 + 21) |
+| 입력 길이 `SEQ_LEN` ✔ | 20 | **25** ✅ #5 (기획서 3-6) | 전원 (기획서) | `data/features.py:16` · `index.html` `const SEQ_LEN` |
+| 판정 윈도우 `WINDOW_SIZE` ✔ | 21 | **15** ✅ #5 | 전원 (기획서) | `monitoring/drift_detector.py:24` · `index.html` `const WINDOW_SIZE` · `simulate_drift.py` `BATCH_N = 40` (= 25 + 15) · `routers/predict.py` `[-WINDOW_SIZE:]` |
+| 재학습 정답 일수 `RETRAIN_DAYS` | 21 (숫자) | **25** → 50행 ✅ #5 | 전원 (기획서) | `monitoring/retrain_trigger.py:31` (판정 윈도우와 별개) |
 | RMSE 임계값 ✔ | 4.00 ($) | **팀 결정** (< 612원/kg) | A 제안 → 전원 합의 | `train_and_register.py:37` `RMSE_GATE` · `drift_detector.py:22` `RMSE_THRESHOLD` · `index.html` `const RMSE_THRESHOLD` |
 | 모델 이름 ✔ | `HAIC_Predictor` | `Tomato_Price_Predictor` (= `items.yaml` `model_name`) | C | `train_and_register.py:38` · `model_loader.py:40` `MLFLOW_MODEL_URI` · `retrain_trigger.py:90` 로그 문구 |
 | 시나리오 기준 가격 | 165.0 | 3,727 (3년 평균) | A 데이터로 D 가 | `simulate_drift.py:75,80` `base=` · `index.html` `DEFAULT_BASE_PRICE` |
@@ -223,4 +224,4 @@ C 모델 이름 변경 ──▶ (B model_loader 리뷰 · D retrain_trigger 문
 - [ ] LLM 호출 방식 — 외부 API(키 · 비용 담당자) / 로컬 ollama(이미지 커짐)
 - [ ] 승격 시 판정 윈도우 초기화 · 이전 버전 Archived · 회귀 테스트 구현 범위
 - [ ] 반입량 API 승인 안 되면 소매가격으로 갈지, 시점은 언제 결정할지
-- [ ] 계절용 그룹을 발표에서 어떻게 설명할지 — 철 시작 후 20거래일 전에는 예측을 안 함 / 지난 철 마지막 가중치에서 시작 (설계만, 구현 X)
+- [ ] 계절용 그룹을 발표에서 어떻게 설명할지 — 철 시작 후 25거래일 전에는 예측을 안 함 / 지난 철 마지막 가중치에서 시작 (설계만, 구현 X)

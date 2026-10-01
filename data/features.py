@@ -7,13 +7,13 @@ Day1 baseline 학습(scripts/train_baseline_v1.py), Day2 MLflow 학습
 한 곳에서만 관리해야 "서빙 시점 입력"과 "학습 시점 입력"이 어긋나는 실무 사고를
 방지할 수 있습니다.
 
-입력 시퀀스: 최근 SEQ_LEN(20)거래일의 (close, volume)
+입력 시퀀스: 최근 SEQ_LEN(25)거래일의 (close, volume)
 타깃: 그다음 거래일의 close
 """
 import csv
 import pickle
 
-SEQ_LEN = 20  # LSTM 입력 윈도우 길이 (거래일 수) - 약 1개월치 거래일
+SEQ_LEN = 25  # LSTM 입력 윈도우 길이 (거래일 수) - 가락시장 한 달 (월~토 거래, 실측 25.3일). 기획서 3-6
 
 
 def load_rows(csv_path: str = "data/haic_prices.csv") -> list[dict]:

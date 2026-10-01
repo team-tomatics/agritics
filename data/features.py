@@ -10,24 +10,15 @@ Day1 baseline 학습(scripts/train_baseline_v1.py), Day2 MLflow 학습
 입력 시퀀스: 최근 SEQ_LEN(25)거래일의 (close, volume)
 타깃: 그다음 거래일의 close
 """
-import csv
 import pickle
+
+from data.validation import load_price_volume_csv
 
 SEQ_LEN = 25  # LSTM 입력 윈도우 길이 (거래일 수) - 가락시장 한 달 (월~토 거래, 실측 25.3일). 기획서 3-6
 
 
 def load_rows(csv_path: str = "data/haic_prices.csv") -> list[dict]:
-    with open(csv_path, encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        rows = [
-            {
-                "Date": r["Date"],
-                "Close": float(r["Close"]),
-                "Volume": float(r["Volume"]),
-            }
-            for r in reader
-        ]
-    return rows
+    return load_price_volume_csv(csv_path)
 
 
 class HAICScaler:

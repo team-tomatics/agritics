@@ -10,7 +10,11 @@
 
 실행 (프로젝트 루트에서)
   python -m report_sidecar.generator              # 1회 생성
-  python -m report_sidecar.generator --every 3600 # 사이드카 컨테이너: 1시간마다
+  python -m report_sidecar.generator --at 05:00   # 사이드카 컨테이너: 시작 시 1회 + 매일 05:00 (한국 시간)
+  python -m report_sidecar.generator --every 3600 # (테스트용) N초마다
+
+보고서 시각 = 가락시장 경매 시각 기준 (#27). 토마토(과일류) 02:00 경매 → 경락가 확정 · 데이터 반영 → 05:00 보고서
+→ 점주 · 본사가 07시 전에 읽는다 (기획서 ② 보고서). 품목을 늘리면 품목별 경매 시각으로 --at 이 달라진다.
 
 환경변수 (.env)
   OPENAI_API_KEY  없으면 템플릿 보고서
@@ -23,7 +27,7 @@ import json
 import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, time as dtime, timedelta
 
 import requests
 
@@ -206,14 +210,32 @@ def generate() -> dict:
     return meta
 
 
+def seconds_until(at: str, now: datetime | None = None) -> float:
+    """다음 at(HH:MM, 한국 시간)까지 남은 초. 이미 지났으면 다음 날."""
+    now = now or datetime.now(history_log.KST)
+    h, m = map(int, at.split(":"))
+    target = datetime.combine(now.date(), dtime(h, m), tzinfo=history_log.KST)
+    if target <= now:
+        target += timedelta(days=1)
+    return (target - now).total_seconds()
+
+
+def _run_once() -> None:
+    m = generate()
+    print(f"[report] {m['date']} source={m['source']} elapsed={m['elapsed_s']}s"
+          + (f" error={m['error']}" if m["error"] else ""), flush=True)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--every", type=float, default=0, help="초 단위 반복 (0 이면 1회)")
+    ap.add_argument("--at", help="매일 이 시각(HH:MM, 한국 시간)에 생성. 시작할 때도 1회 생성")
+    ap.add_argument("--every", type=float, default=0, help="(테스트용) 초 단위 반복")
     args = ap.parse_args()
     load_dotenv()
-    while True:
-        m = generate()
-        print(f"[report] {m['date']} source={m['source']} elapsed={m['elapsed_s']}s" + (f" error={m['error']}" if m["error"] else ""))
-        if args.every <= 0:
-            break
-        time.sleep(args.every)
+    _run_once()  # 시작 시 1회 — /report 가 404 로 비어 있지 않게
+    while args.at or args.every > 0:
+        wait = seconds_until(args.at) if args.at else args.every
+        if args.at:
+            print(f"[report] 다음 생성 {args.at} KST 까지 {wait / 3600:.1f}시간", flush=True)
+        time.sleep(wait)
+        _run_once()

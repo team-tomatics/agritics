@@ -16,11 +16,12 @@
 
 ```bash
 python -m report_sidecar.generator              # 1회 → outputs/reports/YYYY-MM-DD.md + .json
-python -m report_sidecar.generator --every 3600 # 사이드카 컨테이너용 반복
+python -m report_sidecar.generator --at 05:00   # 사이드카 컨테이너: 시작 시 1회 + 매일 05:00 KST (토마토 02:00 경매 기준, #27)
+python -m report_sidecar.generator --every 60    # (테스트용) N초마다
 curl localhost:8077/report                      # 최신 보고서 (없으면 404)
 ```
 
 - 숫자는 `collect_facts()` 가 로그에서 계산한다. LLM 프롬프트와 템플릿이 같은 dict 를 쓴다
 - `prompts/report.md` 에 `TODO` 가 남아 있는 동안은 `generator.py` 의 기본 프롬프트를 쓴다. A 가 채울 때 쓸 수 있는 키: `item_name` `generated_at` `predicted_price` `last_price` `change_pct` `model_version` `drift_detected` `drift_count` `promotions` `request_count` `avg_latency_ms` `error_rate` `low_confidence_rule`
-- C: compose 사이드카는 위 `--every` 명령 + `env_file: .env` + `logs/` · `outputs/` 볼륨 공유 (`serving_app/history_log.py` 를 import 하므로 같은 코드 · 의존성 이미지를 써도 됨)
+- C: compose 사이드카는 위 `--at 05:00` 명령 + `env_file: .env` + `logs/` · `outputs/` 볼륨 공유 (`serving_app/history_log.py` 를 import 하므로 같은 코드 · 의존성 이미지를 써도 됨)
 - D: 생성 직후 `observe.check_report(markdown, drift_detected, elapsed_s)` 를 부른다 (지금은 NotImplementedError 무시). 메타 `.json` 의 `source` · `error` · `elapsed_s` 도 쓸 수 있다

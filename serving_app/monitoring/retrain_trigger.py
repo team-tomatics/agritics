@@ -17,7 +17,7 @@
    아래 3줄이 순서대로 찍히면 성공입니다.
      [WARN] drift detected - triggering retrain
      [INFO] retrain triggered (window=last_21_days)
-     [OK] new_rmse=1.47 - production promoted: HAIC_Predictor v2
+     [OK] new_rmse=1.47 - production promoted: Tomato_Price_Predictor v2
    ※ 로그 문장은 대시보드가 읽으니 글자를 바꾸지 마세요.
 
 ■ 이 파일의 빈칸 : [빈칸 9] 데이터 범위   [빈칸 10] 학습 방식   [빈칸 11] 승격 여부
@@ -87,7 +87,7 @@ def check_and_trigger(recent_predictions: list[dict]) -> dict:
         from serving_app import model_loader
         model_loader._model_cache = None
         logger.info(
-            f"[OK] new_rmse={result['rmse']:.2f} - production promoted: HAIC_Predictor v{result['version']}"
+            f"[OK] new_rmse={result['rmse']:.2f} - production promoted: Tomato_Price_Predictor v{result['version']}"
         )
         return {"status": "retrain_triggered", "promoted": True, "rmse": result["rmse"]}
     return {"status": "retrain_triggered", "promoted": False, "rmse": result["rmse"]}

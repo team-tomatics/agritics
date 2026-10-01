@@ -35,7 +35,7 @@ SEED = 42
 keras.utils.set_random_seed(SEED)
 
 RMSE_GATE = 4.00
-MODEL_NAME = "HAIC_Predictor"
+MODEL_NAME = "Tomato_Price_Predictor"
 SCALER_PATH = "serving_app/models/scaler.pkl"
 BASE_EPOCHS = 100  # 3층 LSTM + 3년치 데이터 기준, RMSE가 안정적으로 게이트 아래로 수렴하는 지점
 FINE_TUNE_EPOCHS = 10

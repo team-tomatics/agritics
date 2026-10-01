@@ -123,9 +123,9 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 
 `multipart/form-data` 의 `file` — UTF-8 CSV, 열 `Date, Close, Volume`, **최소 40행** (입력 25 + 윈도우 15). 저장 전에 `data/validation.py` 로 검증한다 (#18)
 ```json
-{"filename": "haic_1790839653.csv", "rows": 756}
+{"filename": "tomato_1790839653.csv", "rows": 903}
 ```
-400 — 아래는 main(10/1) 에 실제로 보낸 CSV 와 받은 응답 (40행 정상 CSV 는 200 `{"filename": "haic_1790844594.csv", "rows": 40}`)
+400 — 아래는 업로드 검증 오류 예시다. 40행 정상 CSV는 200과 `{"filename": "tomato_1790844594.csv", "rows": 40}`을 반환한다.
 
 | 보낸 CSV | `detail` |
 |---|---|
@@ -143,8 +143,11 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 
 `GET /data/status`
 ```json
-{"exists": true, "filename": "haic_1790839653.csv", "rows": 756,
- "start_date": "2007-01-03", "end_date": "2009-12-31", "min_close": 105.61, "max_close": 195.17}
+{"exists": true, "filename": "tomato_1790839653.csv", "rows": 903,
+ "start_date": "2023-10-02", "end_date": "2026-09-30",
+ "min_close": 1178.0, "max_close": 14717.0, "price_unit": "원/kg",
+ "min_volume": 43250.0, "max_volume": 363668.0,
+ "avg_volume": 144429.16611295682, "volume_unit": "kg"}
 ```
 업로드가 없으면 `{"exists": false}`. 학습 · 재학습은 항상 **가장 최근 업로드** 파일을 쓴다.
 

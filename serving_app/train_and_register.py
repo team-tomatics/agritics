@@ -146,4 +146,5 @@ def fine_tune(rows: list[dict]) -> dict:
 
 
 if __name__ == "__main__":
-    train_and_register()
+    # 게이트 탈락 = exit 1 -> Dockerfile 빌드가 여기서 실패한다 (모델 없는 컨테이너를 만들지 않음, #47)
+    sys.exit(0 if train_and_register()["promoted"] else 1)

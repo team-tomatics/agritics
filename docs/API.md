@@ -13,7 +13,7 @@
 | `GET /health` | 서버 상태 · 모델 로드 여부 · 로딩 모드 | 200 | — | ② 가용성 |
 | `GET /metrics` | 최근 N분 지연 · 에러율 · 경고 (이력 로그 집계) | 200 | 422 `minutes` 범위 | 3-2 응답 지연 · 에러율 |
 | `GET /report` | 최신 일일 보고서 (LLM / 템플릿) | 200 | **404** 아직 없음 | ② GET /report · 3-2 LLM 보고서 |
-| `POST /data/upload` | 시세 CSV 업로드 | 200 | **400** 열 · 행 수 · 인코딩 | 3-1 업로드 검증 |
+| `POST /data/upload` | 시세 CSV 업로드 | 200 | **400** 열 · 행 수 · 날짜 형식 · 중복 · 순서 · 값 범위 · 인코딩 | 3-1 업로드 검증 |
 | `GET /data/status` | 최신 업로드 CSV 요약 | 200 | — | — |
 | `GET /logs` | `logs/` 파일 목록 | 200 | — | 3-3 aiops.log |
 | `GET /logs/{filename}` | 로그 파일 내용 | 200 | 404 없는 파일 · 경로가 섞인 이름 | 3-3 |
@@ -87,12 +87,15 @@
 `logs/history.jsonl` 최근 N분 집계 (기본 5분, 0 < N ≤ 1440 — `minutes=0` 은 422).
 지연 · 에러율은 **`POST /predict` 만으로** 계산한다 — batch-test 는 안에서 재학습(약 8초)이 돌아 섞으면 가짜 지연 경고가 난다 (#25).
 ```json
-{"window_min": 60.0, "target": "/predict", "count": 2, "avg_latency_ms": 129.0, "p95_latency_ms": 200.7,
+{"window_min": 5.0, "target": "/predict", "count": 3, "avg_latency_ms": 79.6, "p95_latency_ms": 194.7,
  "error_rate": 0.0, "client_error_rate": 0.0,
- "total_count": 4, "by_path": {"/predict": 2, "/predict/batch-test": 2},
- "limits": {"avg_latency_ms": 500, "error_rate": 0.05}, "alerts": []}
+ "total_count": 3, "by_path": {"/predict": 3},
+ "limits": {"p95_latency_ms": 500, "error_rate": 0.01}, "alerts": []}
 ```
-(10/1 실측: `/predict` 2회 + batch-test 정상 1 · 드리프트 1. batch-test 지연 313ms · **7,554ms(재학습)** 는 계산에서 빠짐 — 고치기 전엔 같은 시나리오에서 평균 2,054ms · 지연 경고)
+(main 10/1 실측 — Eager 서버에 `/predict` 3회. 첫 요청 약 195ms 가 P95 로 잡혀도 500ms 아래라 경고 없음)
+
+batch-test 는 `count` 에서 빠진다: `/predict` 2회 + batch-test 2회(그중 재학습 **7,554ms**)에서 `count 2 · avg 129.0 · p95 200.7 · alerts []` — 고치기 전(#25)엔 같은 시나리오에서 평균 2,054ms · 지연 경고.
+
 | 필드 | 뜻 |
 |---|---|
 | `count` · 지연 · 에러율 | `target`(`/predict`) 요청만 |
@@ -118,11 +121,25 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 
 ## POST /data/upload  ·  GET /data/status   (A 심준용)
 
-`multipart/form-data` 의 `file` — UTF-8 CSV, 열 `Date, Close, Volume`, **최소 40행** (입력 25 + 윈도우 15)
+`multipart/form-data` 의 `file` — UTF-8 CSV, 열 `Date, Close, Volume`, **최소 40행** (입력 25 + 윈도우 15). 저장 전에 `data/validation.py` 로 검증한다 (#18)
 ```json
 {"filename": "haic_1790839653.csv", "rows": 756}
 ```
-400: `"UTF-8로 인코딩된 CSV 파일만 업로드할 수 있습니다."` · `"CSV에 ['Close', 'Date', 'Volume'] 컬럼이 모두 있어야 합니다."` · `"최소 40행 이상의 데이터가 필요합니다."` (39행 → 400, 40행 → 200 확인)
+400 — 아래는 main(10/1) 에 실제로 보낸 CSV 와 받은 응답 (40행 정상 CSV 는 200 `{"filename": "haic_1790844594.csv", "rows": 40}`)
+
+| 보낸 CSV | `detail` |
+|---|---|
+| 39행 | `최소 40행 이상의 데이터가 필요합니다. 현재 39행입니다.` |
+| `Volume` 열 없음 | `CSV에 ['Volume'] 컬럼이 없습니다. 필수 컬럼: ['Close', 'Date', 'Volume']` |
+| 날짜 `2026/01/06` | `7행의 Date는 YYYY-MM-DD 형식이어야 합니다: '2026/01/06'` |
+| 같은 날짜 두 번 | `중복 날짜가 있습니다: 2026-01-06` |
+| 날짜 순서 뒤바뀜 | `Date는 오름차순이어야 합니다: 2026-01-08 다음에 2026-01-07` |
+| `Close` 0 | `5행의 Close는 0보다 커야 합니다.` |
+| `Volume` −1 | `5행의 Volume은 0 이상이어야 합니다.` |
+| `Close` 빈 칸 | `5행의 Close 값이 비어 있습니다.` |
+| UTF-8 아님 | `UTF-8로 인코딩된 CSV 파일만 업로드할 수 있습니다.` (코드의 문구 — 이번 테스트에선 안 보냄) |
+
+행 번호는 헤더를 1행으로 센 CSV 줄 번호다.
 
 `GET /data/status`
 ```json

@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import mlflow
 import mlflow.tensorflow
 import numpy as np
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 from tensorflow import keras
 
@@ -55,16 +56,35 @@ def _prepare(rows: list[dict], scaler: HAICScaler):
     return X_train, y_train_scaled, X_test, y_test
 
 
-def _register_if_gate_passed(model, run_id: str, score: float) -> dict:
+def _score(model, X_test, y_test, scaler: HAICScaler) -> float:
+    preds = [scaler.inverse_close(p) for p in model.predict(X_test, verbose=0).flatten()]
+    return rmse(y_test, preds)
+
+
+def _production_score(X_test, y_test, scaler: HAICScaler) -> float | None:
+    """회귀 테스트 기준: 현재 Production 을 새 모델과 같은 test 셋으로 채점. 첫 등록이면 None."""
+    try:
+        prod = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
+    except MlflowException:
+        return None
+    return _score(prod, X_test, y_test, scaler)
+
+
+def _register_if_gate_passed(model, run_id: str, score: float, prod_score: float | None) -> dict:
     result = {"run_id": run_id, "rmse": score, "promoted": False}
-    if score <= RMSE_GATE:
+    if score > RMSE_GATE:
+        print(f"[GATE FAILED] rmse={score:.2f} > {RMSE_GATE} -> 배포 차단, 기존 Production 유지")
+    elif prod_score is not None and score > prod_score:
+        print(f"[GATE FAILED] rmse={score:.2f} > production rmse={prod_score:.2f} (회귀) -> 배포 차단, 기존 Production 유지")
+    else:
         v = mlflow.register_model(f"runs:/{run_id}/model", MODEL_NAME)
-        MlflowClient().transition_model_version_stage(name=MODEL_NAME, version=v.version, stage="Production")
+        # 이전 Production 은 Archived 로 — Production 은 항상 1개, 롤백 대상은 가장 최근 Archived
+        MlflowClient().transition_model_version_stage(
+            name=MODEL_NAME, version=v.version, stage="Production", archive_existing_versions=True
+        )
         result["promoted"] = True
         result["version"] = v.version
         print(f"[GATE PASSED] rmse={score:.2f} -> {MODEL_NAME} v{v.version} promoted to Production")
-    else:
-        print(f"[GATE FAILED] rmse={score:.2f} > {RMSE_GATE} -> 배포 차단, 기존 Production 유지")
     return result
 
 
@@ -78,20 +98,22 @@ def train_and_register(csv_path: str | None = None, rows: list[dict] | None = No
         rows = load_rows(csv_path or latest_upload())
     scaler = HAICScaler.load(SCALER_PATH)
     X_train, y_train_scaled, X_test, y_test = _prepare(rows, scaler)
+    prod_score = _production_score(X_test, y_test, scaler)
 
     with mlflow.start_run(run_name="base-train"):
         model = build_model()
         model.fit(X_train, y_train_scaled, epochs=BASE_EPOCHS, verbose=0)
 
-        preds = [scaler.inverse_close(p) for p in model.predict(X_test, verbose=0).flatten()]
-        score = rmse(y_test, preds)
+        score = _score(model, X_test, y_test, scaler)
 
         mlflow.log_param("mode", "scratch")
         mlflow.log_param("epochs", BASE_EPOCHS)
         mlflow.log_metric("rmse", score)
         mlflow.tensorflow.log_model(model, name="model", input_example=X_train[:1])
 
-        return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score)
+        if prod_score is not None:
+            mlflow.log_metric("prod_rmse", prod_score)
+        return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
 
 
 def fine_tune(rows: list[dict]) -> dict:
@@ -104,12 +126,12 @@ def fine_tune(rows: list[dict]) -> dict:
 
     model = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
     model.compile(optimizer=keras.optimizers.Adam(learning_rate=FINE_TUNE_LR), loss="mse")
+    prod_score = _score(model, X_test, y_test, scaler)  # fine-tune 전 = 현재 Production
 
     with mlflow.start_run(run_name="fine-tune"):
         model.fit(X_train, y_train_scaled, epochs=FINE_TUNE_EPOCHS, verbose=0)
 
-        preds = [scaler.inverse_close(p) for p in model.predict(X_test, verbose=0).flatten()]
-        score = rmse(y_test, preds)
+        score = _score(model, X_test, y_test, scaler)
 
         mlflow.log_param("mode", "fine-tune")
         mlflow.log_param("epochs", FINE_TUNE_EPOCHS)
@@ -117,7 +139,9 @@ def fine_tune(rows: list[dict]) -> dict:
         mlflow.log_metric("rmse", score)
         mlflow.tensorflow.log_model(model, name="model", input_example=X_train[:1])
 
-        return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score)
+        if prod_score is not None:
+            mlflow.log_metric("prod_rmse", prod_score)
+        return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
 
 
 if __name__ == "__main__":

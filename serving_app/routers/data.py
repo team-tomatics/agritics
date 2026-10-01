@@ -7,7 +7,6 @@ HAIC 가상 데이터 업로드 - data/generate_haic_data.py로 자동 생성하
 
 대시보드(static/index.html)에서 파일을 올리면 이 엔드포인트가 호출됩니다.
 """
-import csv
 import io
 import os
 import time
@@ -16,11 +15,11 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from data.features import SEQ_LEN, load_rows
 from data.storage import UPLOAD_DIR, latest_upload
+from data.validation import DataValidationError, parse_price_volume_csv
 from serving_app.monitoring.drift_detector import WINDOW_SIZE
 
 router = APIRouter(prefix="/data")
 
-REQUIRED_COLUMNS = {"Date", "Close", "Volume"}
 MIN_ROWS = SEQ_LEN + WINDOW_SIZE  # 시퀀스 구성 + 드리프트 판정 윈도우에 필요한 최소 행 수
 
 
@@ -32,12 +31,10 @@ async def upload(file: UploadFile = File(...)):
     except UnicodeDecodeError:
         raise HTTPException(400, "UTF-8로 인코딩된 CSV 파일만 업로드할 수 있습니다.")
 
-    reader = csv.DictReader(io.StringIO(text))
-    if not REQUIRED_COLUMNS.issubset(set(reader.fieldnames or [])):
-        raise HTTPException(400, f"CSV에 {sorted(REQUIRED_COLUMNS)} 컬럼이 모두 있어야 합니다.")
-    rows = list(reader)
-    if len(rows) < MIN_ROWS:
-        raise HTTPException(400, f"최소 {MIN_ROWS}행 이상의 데이터가 필요합니다.")
+    try:
+        rows = parse_price_volume_csv(io.StringIO(text), min_rows=MIN_ROWS)
+    except DataValidationError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     dest = os.path.join(UPLOAD_DIR, f"haic_{int(time.time())}.csv")

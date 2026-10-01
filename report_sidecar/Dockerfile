@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir requests==2.33.1 fastapi==0.141.1
 COPY serving_app/__init__.py serving_app/history_log.py serving_app/
 COPY report_sidecar/ report_sidecar/
 
-# 1시간마다 생성. 데모에서 바로 만들려면:
+# print 가 버퍼에 묶이지 않고 docker logs 에 바로 보이게 (#28)
+ENV PYTHONUNBUFFERED=1
+
+# 시작 시 1회 + 매일 06:00 KST (토마토 경매 02:00 기준, #27). 데모에서 바로 만들려면:
 #   docker compose -f serving_app/docker-compose.yml exec report-sidecar python -m report_sidecar.generator
-CMD ["python", "-m", "report_sidecar.generator", "--every", "3600"]
+CMD ["python", "-m", "report_sidecar.generator", "--at", "06:00"]

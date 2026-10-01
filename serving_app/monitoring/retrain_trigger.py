@@ -28,6 +28,7 @@ from serving_app.monitoring.drift_detector import is_drift
 
 # "aiops" 이름의 기록장. main.py 가 이 기록장을 logs/aiops.log 파일에 연결해 두었습니다.
 logger = logging.getLogger("aiops")
+RETRAIN_DAYS = 25  # 재학습 정답 거래일 수 (가락시장 한 달) — 판정 윈도우와 별개. 기획서 3-6
 
 
 def check_and_trigger(recent_predictions: list[dict]) -> dict:
@@ -45,24 +46,25 @@ def check_and_trigger(recent_predictions: list[dict]) -> dict:
     # 함수 안에서 import 하는 이유: 파일끼리 서로를 import 하다 꼬이는 문제(순환 import)를 피하려고
     #   load_rows          : CSV → 행 목록
     #   latest_upload      : 가장 최근 업로드한 CSV 경로
-    #   SEQ_LEN            : 창문 길이 (20)
+    #   SEQ_LEN            : 창문 길이 (25)
     #   train_and_register : Day2 — 새 모델을 "처음부터" 학습 (scratch)
     #   fine_tune          : Day3 — Production 모델을 "이어받아" 짧게 추가 학습 (warm start)
     from data.features import load_rows, SEQ_LEN
     from data.storage import latest_upload
     from serving_app.train_and_register import fine_tune
 
-    logger.info("[INFO] retrain triggered (window=last_21_days)")
+    logger.info(f"[INFO] retrain triggered (window=last_{RETRAIN_DAYS}_days)")
 
     # ════════════════════════════ [빈칸 9] ════════════════════════════
-    # 재학습에 쓸 "최근 데이터"만 잘라 오세요.  목표: 최근 21거래일(한 달)의 정답으로 학습
+    # 재학습에 쓸 "최근 데이터"만 잘라 오세요.  목표: 최근 RETRAIN_DAYS(25)거래일(한 달)의 정답으로 학습
     #
     #   생각해 볼 질문
     #     · 21일치 정답으로 학습하려면, 문제(창문 20일)까지 포함해 몇 행이 필요할까요?
     #       (predict.py [빈칸 6]의 그림: 가격 41개 → 예측 21번)
     #     · 딱 21행만 자르면 build_sequences 가 만들 수 있는 문제는 몇 개일까요?
     #   형태 : 리스트[-(N):] 은 "뒤에서 N개"입니다. ___ 에 N 을 계산식으로 쓰세요. (숫자 41 대신 21 과 상수 이름으로)
-    rows = load_rows(latest_upload())[-(21 + SEQ_LEN):]
+    # 팀: 판정 윈도우(15)와 분리 — 최근 한 달(25거래일) 정답 + 입력 25 = 50행 (기획서 3-6)
+    rows = load_rows(latest_upload())[-(RETRAIN_DAYS + SEQ_LEN):]
 
     # ════════════════════════════ [빈칸 10] ════════════════════════════
     # 41행으로 재학습을 실행하세요.  (위 import 설명의 두 함수 중 하나)

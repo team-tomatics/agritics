@@ -15,15 +15,16 @@
 """
 from fastapi import APIRouter, Request
 
-from data.features import SEQ_LEN  # = 20
+from data.features import SEQ_LEN  # = 25
 from serving_app import model_loader
 from serving_app.schemas import PredictRequest, PredictResponse, BatchTestRequest, BatchTestResponse
+from serving_app.monitoring.drift_detector import WINDOW_SIZE
 from serving_app.monitoring.retrain_trigger import check_and_trigger
 
 router = APIRouter()
 
 # (Day3) 최근 예측 기록을 모아 두는 목록.  예: [{"predicted": 161.2, "actual": 163.0}, ...]
-#        드리프트 판단은 "최근 21건"(drift_detector.py 의 WINDOW_SIZE)만 보므로 21개까지만 유지합니다.
+#        드리프트 판단은 "최근 WINDOW_SIZE(15)건"(drift_detector.py)만 보므로 그만큼만 유지합니다.
 recent_predictions: list[dict] = []
 
 # (Day3) 시뮬레이션은 종가만 보내므로, 거래량은 이 값으로 고정해서 채웁니다.
@@ -91,9 +92,9 @@ def batch_test(req: BatchTestRequest, request: Request):
         predictions.append(pred)
         recent_predictions.append({"predicted": pred, "actual": actual})
 
-    # 최근 21건만 남기기 — 오래된 기록까지 섞이면 "지금" 상태를 판단할 수 없습니다.
+    # 최근 WINDOW_SIZE(15)건만 남기기 — 오래된 기록까지 섞이면 "지금" 상태를 판단할 수 없습니다.
     # (recent_predictions = ... 로 쓰면 함수 안의 새 변수가 되므로, [:] 로 목록 내용을 바꿉니다)
-    recent_predictions[:] = recent_predictions[-21:]  # WINDOW_SIZE 유지
+    recent_predictions[:] = recent_predictions[-WINDOW_SIZE:]
 
     # 드리프트 판단·재학습은 retrain_trigger.py 가 합니다. 여기서는 넘겨주기만!
     drift_check = check_and_trigger(recent_predictions)

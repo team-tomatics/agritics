@@ -98,13 +98,14 @@ def train_and_register(csv_path: str | None = None, rows: list[dict] | None = No
         rows = load_rows(csv_path or latest_upload())
     scaler = HAICScaler.load(SCALER_PATH)
     X_train, y_train_scaled, X_test, y_test = _prepare(rows, scaler)
-    prod_score = _production_score(X_test, y_test, scaler)
 
     with mlflow.start_run(run_name="base-train"):
         model = build_model()
         model.fit(X_train, y_train_scaled, epochs=BASE_EPOCHS, verbose=0)
 
         score = _score(model, X_test, y_test, scaler)
+        # Production 로드는 난수를 소비한다 — 학습 뒤에 해야 SEED 재현성이 Production 유무와 무관해진다 (#23)
+        prod_score = _production_score(X_test, y_test, scaler)
 
         mlflow.log_param("mode", "scratch")
         mlflow.log_param("epochs", BASE_EPOCHS)

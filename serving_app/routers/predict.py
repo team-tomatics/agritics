@@ -13,7 +13,7 @@
 
 ■ 이 파일의 빈칸 : [빈칸 6]  (batch_test 의 슬라이딩 윈도우)
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from data.features import SEQ_LEN  # = 20
 from serving_app import model_loader
@@ -31,7 +31,7 @@ SIMULATED_VOLUME = 1_200_000
 
 
 @router.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
+def predict(req: PredictRequest, request: Request):
     """
     [Day1] 다음날 종가 예측  (완성)
     받는 것  : {"sequence": [{"close": 160.0, "volume": 1200000}, ... 20개]}
@@ -43,12 +43,14 @@ def predict(req: PredictRequest):
     """
     model = model_loader.get_model()
     sequence = [p.model_dump() for p in req.sequence]
-    predicted_close = model.predict_one(sequence)
-    return PredictResponse(predicted_close=round(predicted_close, 2), model_version=model.version)
+    predicted_close = round(model.predict_one(sequence), 2)
+    # 이력 로그 (history_log.py 미들웨어가 이 값을 한 줄에 합쳐 기록)
+    request.state.history = {"model_version": model.version, "predicted": predicted_close, "input_last": sequence[-1]}
+    return PredictResponse(predicted_close=predicted_close, model_version=model.version)
 
 
 @router.post("/predict/batch-test", response_model=BatchTestResponse)
-def batch_test(req: BatchTestRequest):
+def batch_test(req: BatchTestRequest, request: Request):
     """
     [Day3] 드리프트 시뮬레이션
     받는 것  : {"prices": [165.0, 166.2, ... 41개]}   (scripts/simulate_drift.py 가 보냄)
@@ -95,4 +97,6 @@ def batch_test(req: BatchTestRequest):
 
     # 드리프트 판단·재학습은 retrain_trigger.py 가 합니다. 여기서는 넘겨주기만!
     drift_check = check_and_trigger(recent_predictions)
+    request.state.history = {"model_version": model.version, "predicted": round(predictions[-1], 2) if predictions else None,
+                             "n_predictions": len(predictions), "drift_status": drift_check.get("status")}
     return BatchTestResponse(predictions=predictions, drift_check=drift_check)

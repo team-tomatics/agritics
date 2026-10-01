@@ -16,8 +16,8 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from serving_app import model_loader
-from serving_app.routers import data, health, logs, predict, report
+from serving_app import history_log, model_loader
+from serving_app.routers import data, health, logs, metrics, predict, report
 
 # monitoring/retrain_trigger.py가 쓰는 "aiops" 로거를 logs/aiops.log 파일에 연결한다.
 # (routers/logs.py가 같은 디렉토리를 읽기 전용으로 노출한다.) 여기서 이 로거 하나만
@@ -33,12 +33,14 @@ if not _aiops_logger.handlers:
     _aiops_logger.addHandler(logging.StreamHandler())  # 터미널에서도 동일하게 확인 가능
 
 app = FastAPI(title="HAIC Serving & AIOps")
+app.middleware("http")(history_log.history_middleware)  # 팀 추가: 요청마다 logs/history.jsonl 한 줄
 
 app.include_router(predict.router)
 app.include_router(health.router)
 app.include_router(data.router)  # HAIC 데이터 업로드
 app.include_router(logs.router)  # 대시보드: 재학습 로그 파일 조회
 app.include_router(report.router)  # 팀 추가: LLM 사이드카 일일 보고서
+app.include_router(metrics.router)  # 팀 추가: 5분 집계 지연 · 에러율
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")  # 대시보드 UI

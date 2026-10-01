@@ -59,7 +59,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | | 이름 | 역할 | 소유 파일 | 내 AIOps 신호 | 기획서 · 발표 |
 |---|---|---|---|---|---|
 | **A** | 심준용 | 데이터 오너 | `data/*` · `routers/data.py` · `scripts/train_baseline_v1.py` · `scripts/fetch_*.py` · `config/items.yaml` · `report_sidecar/prompts/` | 입력 데이터 드리프트 — 가격 · 반입량 분포 (PSI · KS) | ① Pain Point · 업로드 · `/data/status` · 분포 비교 · 보고서 예시 |
-| **B** | 박유진 | 서빙 오너 (+ Git) | `schemas.py` · `model_loader.py` · `main.py` · `history_log.py` · `routers/predict.py` `health.py` `report.py` · `report_sidecar/generator.py` | 응답 지연 · 에러율 (지연 > 500ms · 에러율 > 5%) | ② 운영 목표 · ⑤ API 명세(/report 포함) · 지연 측정표 |
+| **B** | 박유진 | 서빙 오너 (+ Git) | `schemas.py` · `model_loader.py` · `main.py` · `history_log.py` · `routers/predict.py` `health.py` `report.py` · `report_sidecar/generator.py` | 응답 지연 · 에러율 (P95 > 500ms · 5xx 에러율 > 1%) | ② 운영 목표 · ⑤ API 명세(/report 포함) · 지연 측정표 |
 | **C** | 황재원 | MLOps 오너 | `train_and_register.py` · `lstm_model.py` · `Dockerfile` · `docker-compose.yml` · `requirements.txt` · `report_sidecar/Dockerfile` | 모델 버전 관리 — 전환 · 실패 시 기존 유지 · 재학습 뒤 캐시 비우기 | ③ 게이트 절 · ④ 아키텍처 · MLflow 버전 전 · 후 · 컨테이너 기동 |
 | **D** | 민영은 | 모니터링 오너 | `monitoring/*` · `scripts/simulate_drift.py` · `static/index.html` · `routers/logs.py` · `report_sidecar/observe.py` | 예측 드리프트(21건 윈도우) + 생성형 출력 이상 | ③ 드리프트 대응 절 · 드리프트 → [WARN] → 재학습 → 보고서 라이브 데모 |
 
@@ -118,7 +118,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | 드리프트 임계값 원/kg (공유 상수 — 게이트와 같은 값) | `drift_detector.py` · `index.html` | 3-2 |
 | 폭염 시나리오 — 기준 가격 165 → 토마토 평균(3,727원/kg), 급등형 배치 | `simulate_drift.py` · `index.html` 복제 상수 | 3-3 |
 | 승격 시 판정 윈도우 초기화 (팀 결정) | `retrain_trigger.py` | 3-4 #7 |
-| 지연 > 500ms · 에러율 > 5% → `aiops.log` 경고 (B 의 집계 함수 사용) | `monitoring/` | 3-2 |
+| P95 지연 > 500ms · 5xx 에러율 > 1% → `aiops.log` 경고 (B 의 `/metrics` · `summarize()` 사용, #31) | `monitoring/` | 3-2 |
 | LLM 관측 — 생성 실패 · 30초 초과 · 드리프트인데 "신뢰도 낮음" 누락 → 경고 | `report_sidecar/observe.py` (뼈대 있음) | 3-2 |
 | 대시보드 문구 HAIC → "농수산물 시세 예보 · 토마토" (서비스명 + 현재 품목) | `index.html` | 6장 · 「품목 그룹」 |
 | (선택) 재학습을 BackgroundTasks 로 분리 또는 한계로 명시 | `retrain_trigger.py` · `routers/predict.py`(B 리뷰) | 3-4 #8 |

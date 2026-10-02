@@ -2,7 +2,7 @@
 학습 · 게이트 · MLflow 등록 · fine-tune 재학습
 
 작성자: 황재원 (원본: 교수님 스켈레톤)
-버전: v0.8.0 (2026-10-02)
+버전: v0.9.0 (2026-10-02)
 변경 이력:
   v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본)
   v0.2.0  #11  모델 이름 Tomato_Price_Predictor
@@ -12,6 +12,7 @@
   v0.6.0  #57  게이트 612원/kg (박유진)
   v0.7.0  #75  PriceVolumeScaler · 토마토 문구 (박유진)
   v0.8.0  #86  최초 Production 승격을 aiops.log 에 기록 (민영은)
+  v0.9.0  #104 MLflow 에 mae · wape · bias 기록 (판정은 RMSE 그대로)
 
 Day2: MLflow로 토마토 시세 LSTM 모델을 학습 -> 기록(Tracking) -> 게이트 검증 -> 등록(Registry) -> Production 승격.
 Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 fine-tuning 재학습.
@@ -63,6 +64,24 @@ def rmse(y_true, y_pred) -> float:
     return float(np.sqrt(np.mean((np.array(y_true) - np.array(y_pred)) ** 2)))
 
 
+# 아래 셋은 기록 · 평가용 (#104, 교수님 안내 "명절 구간 평가 MAE + WAPE"). 판정은 RMSE 만 쓴다
+# 정의는 scripts/gate_metrics.py 와 같다
+def mae(y_true, y_pred) -> float:
+    return float(np.mean(np.abs(np.array(y_true) - np.array(y_pred))))
+
+
+def wape(y_true, y_pred) -> float:
+    """% — Σ|실제 − 예측| / Σ실제"""
+    y_true = np.array(y_true)
+    return float(np.sum(np.abs(y_true - np.array(y_pred))) / np.sum(y_true) * 100)
+
+
+def bias(y_true, y_pred) -> float:
+    """% — Σ(예측 − 실제) / Σ실제. 음수 = 과소예측, 양수 = 과대예측"""
+    y_true = np.array(y_true)
+    return float(np.sum(np.array(y_pred) - y_true) / np.sum(y_true) * 100)
+
+
 def _prepare(rows: list[dict], scaler: PriceVolumeScaler):
     X, y = build_sequences(rows, scaler)
     X_train, y_train, X_test, y_test = train_test_split(X, y)
@@ -72,12 +91,13 @@ def _prepare(rows: list[dict], scaler: PriceVolumeScaler):
     return X_train, y_train_scaled, X_test, y_test
 
 
-def _score(model, X_test, y_test, scaler: PriceVolumeScaler) -> float:
+def _score(model, X_test, y_test, scaler: PriceVolumeScaler) -> dict:
+    """{"rmse": 원/kg, "mae": 원/kg, "wape": %, "bias": %}"""
     preds = [scaler.inverse_close(p) for p in model.predict(X_test, verbose=0).flatten()]
-    return rmse(y_test, preds)
+    return {f.__name__: f(y_test, preds) for f in (rmse, mae, wape, bias)}
 
 
-def _production_score(X_test, y_test, scaler: PriceVolumeScaler) -> float | None:
+def _production_score(X_test, y_test, scaler: PriceVolumeScaler) -> dict | None:
     """회귀 테스트 기준: 현재 Production 을 새 모델과 같은 test 셋으로 채점. 첫 등록이면 None."""
     try:
         prod = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
@@ -86,12 +106,14 @@ def _production_score(X_test, y_test, scaler: PriceVolumeScaler) -> float | None
     return _score(prod, X_test, y_test, scaler)
 
 
-def _register_if_gate_passed(model, run_id: str, score: float, prod_score: float | None) -> dict:
-    result = {"run_id": run_id, "rmse": score, "promoted": False}
-    if score > RMSE_GATE:
-        print(f"[GATE FAILED] rmse={score:.2f} > {RMSE_GATE} -> 배포 차단, 기존 Production 유지")
-    elif prod_score is not None and score > prod_score:
-        print(f"[GATE FAILED] rmse={score:.2f} > production rmse={prod_score:.2f} (회귀) -> 배포 차단, 기존 Production 유지")
+def _register_if_gate_passed(model, run_id: str, score: dict, prod_score: dict | None) -> dict:
+    """판정은 RMSE 만 — 게이트 RMSE ≤ RMSE_GATE · 회귀 테스트 RMSE ≤ 현재 Production. mae · wape · bias 는 표시 · 기록용"""
+    result = {"run_id": run_id, **score, "promoted": False}
+    extra = f"(mae={score['mae']:.1f} wape={score['wape']:.1f}% bias={score['bias']:+.1f}%)"
+    if score["rmse"] > RMSE_GATE:
+        print(f"[GATE FAILED] rmse={score['rmse']:.2f} > {RMSE_GATE} {extra} -> 배포 차단, 기존 Production 유지")
+    elif prod_score is not None and score["rmse"] > prod_score["rmse"]:
+        print(f"[GATE FAILED] rmse={score['rmse']:.2f} > production rmse={prod_score['rmse']:.2f} (회귀) {extra} -> 배포 차단, 기존 Production 유지")
     else:
         v = mlflow.register_model(f"runs:/{run_id}/model", MODEL_NAME)
         # 이전 Production 은 Archived 로 — Production 은 항상 1개, 롤백 대상은 가장 최근 Archived
@@ -100,7 +122,7 @@ def _register_if_gate_passed(model, run_id: str, score: float, prod_score: float
         )
         result["promoted"] = True
         result["version"] = v.version
-        print(f"[GATE PASSED] rmse={score:.2f} -> {MODEL_NAME} v{v.version} promoted to Production")
+        print(f"[GATE PASSED] rmse={score['rmse']:.2f} {extra} -> {MODEL_NAME} v{v.version} promoted to Production")
     return result
 
 
@@ -125,11 +147,11 @@ def train_and_register(csv_path: str | None = None, rows: list[dict] | None = No
 
         mlflow.log_param("mode", "scratch")
         mlflow.log_param("epochs", BASE_EPOCHS)
-        mlflow.log_metric("rmse", score)
+        mlflow.log_metrics(score)
         mlflow.tensorflow.log_model(model, name="model", input_example=X_train[:1])
 
         if prod_score is not None:
-            mlflow.log_metric("prod_rmse", prod_score)
+            mlflow.log_metrics({f"prod_{k}": v for k, v in prod_score.items()})
         result = _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
         if result["promoted"]:
             log_promotion(result["rmse"], MODEL_NAME, result["version"])
@@ -156,11 +178,11 @@ def fine_tune(rows: list[dict]) -> dict:
         mlflow.log_param("mode", "fine-tune")
         mlflow.log_param("epochs", FINE_TUNE_EPOCHS)
         mlflow.log_param("n_rows", len(rows))
-        mlflow.log_metric("rmse", score)
+        mlflow.log_metrics(score)
         mlflow.tensorflow.log_model(model, name="model", input_example=X_train[:1])
 
         if prod_score is not None:
-            mlflow.log_metric("prod_rmse", prod_score)
+            mlflow.log_metrics({f"prod_{k}": v for k, v in prod_score.items()})
         return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
 
 

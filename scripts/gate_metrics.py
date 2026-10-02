@@ -2,9 +2,10 @@
 게이트 지표 비교 — RMSE · MAPE 를 모델 · 단순 예측 · 재학습 모델로 한 번에 (#102 MAPE 게이트 결정 · 검증용)
 
 작성자: 박유진
-버전: v1.0.0 (2026-10-02)
+버전: v1.1.0 (2026-10-02)
 변경 이력:
   v1.0.0  #102  RMSE · MAPE 비교 (게이트 시험 구간 · 재학습 채점 구간)
+  v1.1.0  #102  줄마다 게이트 판정 (RMSE ≤ RMSE_GATE OR MAPE ≤ MAPE_GATE, train_and_register 상수 그대로)
 
 프로젝트 루트에서 (mlflow.db · scaler.pkl 이 있어야 함 — train_baseline_v1 · train_and_register 실행 후)
     python scripts/gate_metrics.py                         # data/tomato_prices.csv 기준
@@ -52,8 +53,13 @@ def _window(rows, scaler, model):
     return span, y_test, pred, naive
 
 
-def _line(label, y, p):
-    return f"  {label:<28} RMSE {rmse(y, p):8.1f}원/kg · MAPE {mape(y, p):5.1f}%"
+def _line(label, y, p, gate=None):
+    """gate = (RMSE_GATE, MAPE_GATE) 면 게이트 판정을 붙인다 (회귀 테스트는 따로 — [3] 에서 Production 과 RMSE 비교)."""
+    r, m = rmse(y, p), mape(y, p)
+    line = f"  {label:<28} RMSE {r:8.1f}원/kg · MAPE {m:5.1f}%"
+    if gate:
+        line += "  게이트 " + ("통과" if r <= gate[0] or m <= gate[1] else "탈락")
+    return line
 
 
 def main():
@@ -67,13 +73,15 @@ def main():
     from mlflow.tracking import MlflowClient
 
     from serving_app.monitoring.retrain_trigger import RETRAIN_DAYS
-    from serving_app.train_and_register import MODEL_NAME
+    from serving_app.train_and_register import MAPE_GATE, MODEL_NAME, RMSE_GATE
 
     mlflow.set_tracking_uri(a.tracking_uri)
     rows = load_rows(a.csv)
     scaler = PriceVolumeScaler.load(SCALER_PATH)
     closes = [r["Close"] for r in rows]
-    print(f"데이터 {a.csv} · {len(rows)}행 ({rows[0]['Date']} ~ {rows[-1]['Date']})\n")
+    gate = (RMSE_GATE, MAPE_GATE)
+    print(f"데이터 {a.csv} · {len(rows)}행 ({rows[0]['Date']} ~ {rows[-1]['Date']})")
+    print(f"게이트 RMSE ≤ {RMSE_GATE:.0f}원/kg OR MAPE ≤ {MAPE_GATE:.0f}% · 재학습은 회귀 테스트(RMSE ≤ 현재 Production)도\n")
 
     print("[1] 전체 기간 단순 예측 (평시 기준선)")
     print(_line("단순 예측 내일 = 오늘", closes[1:], closes[:-1]))
@@ -81,8 +89,8 @@ def main():
     prod = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
     span, y, pred, naive = _window(rows, scaler, prod)
     print(f"\n[2] 게이트 시험 구간 {span}")
-    print(_line("Production", y, pred))
-    print(_line("단순 예측", y, naive))
+    print(_line("Production", y, pred, gate))
+    print(_line("단순 예측", y, naive, gate))
 
     recent = rows[-(RETRAIN_DAYS + SEQ_LEN):]
     span, y, pred, naive = _window(recent, scaler, prod)
@@ -94,10 +102,12 @@ def main():
     if runs:
         ft = mlflow.tensorflow.load_model(f"runs:/{runs[0].info.run_id}/model")
         _, _, ft_pred, _ = _window(recent, scaler, ft)
-        print(_line("최근 fine-tune 모델", y, ft_pred))
+        print(_line("최근 fine-tune 모델", y, ft_pred, gate))
+        verdict = "통과" if rmse(y, ft_pred) <= rmse(y, pred) else "탈락"
+        print(f"  {'회귀 테스트 (RMSE vs Production)':<28} {verdict}")
     else:
         print("  (fine-tune 실행 기록 없음 — 드리프트 재학습을 한 번 돌린 뒤 다시 실행)")
-    print(_line("단순 예측", y, naive))
+    print(_line("단순 예측", y, naive, gate))
 
 
 if __name__ == "__main__":

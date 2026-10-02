@@ -68,13 +68,19 @@
 {"predictions": [2539.5, 2492.9, 2439.9, ... 15개],
  "drift_check": {"status": "ok"}}
 ```
-드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트(612원/kg) · 회귀 테스트 → 통과하면 승격. 아래는 실제 2026-08-13 ~ 09-30 급등 구간 — 재학습한 모델도 게이트를 못 넘어 **기존 Production 유지**
+드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트 · 회귀 테스트 → 통과하면 승격 (#102)
+- **게이트**: `RMSE ≤ 612원/kg` **또는** `MAPE ≤ 28%` (`MAPE_GATE` = 평시 Production MAPE 14.0% 의 2배 — 가격이 뛴 구간은 원 단위 오차가 커져 RMSE 만으로는 늘 탈락)
+- **회귀 테스트**: 새 모델 RMSE ≤ 같은 채점 구간의 현재 Production RMSE
+- 드리프트 판정 자체는 그대로 RMSE 612원/kg
+
+아래는 실제 2026-08-13 ~ 09-30 급등(추석) 구간 — 재학습 모델 RMSE 1258.41 · MAPE 25.9% → 게이트(MAPE) 통과 · 회귀 테스트(1258 < Production 1371) 통과 → **v2 승격**
 ```json
 {"predictions": [4230.1, 4628.2, 4998.2, ... 15개],
- "drift_check": {"status": "retrain_triggered", "promoted": false, "rmse": 1258.41}}
+ "drift_check": {"status": "retrain_triggered", "promoted": true, "rmse": 1258.41}}
 ```
-통과하면 `"promoted": true` 와 새 `"rmse"` · 다음 `/predict` 의 `model_version` 이 `production-v2` 로 바뀐다
-(10/2 토마토 Production 모델 실측)
+다음 `/predict` 의 `model_version` 이 `production-v1` → `production-v2` 로 바뀐다 (`predicted_close` 3925.86 → 3748.49)
+둘 다 떨어지면(예: RMSE 700 · MAPE 30%) `"promoted": false` 로 **기존 Production 유지**
+(10/2 토마토 Production 모델 · `feat/102-mape-gate` 컨테이너 8099 실측. MAPE 게이트 전 main 에서는 같은 요청이 `"promoted": false` — RMSE 1258 > 612)
 - 승격되면 서버 모델 캐시를 비워 **다음 `/predict` 부터 새 버전**으로 응답한다 (기획서 3-4)
 - 재학습은 요청 안에서 동기로 돈다 (약 8초) — 기획서 3-4 #8 한계
 

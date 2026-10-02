@@ -2,13 +2,14 @@
 예측 API — POST /predict · /predict/batch-test
 
 작성자: 박유진 (원본: 교수님 스켈레톤)
-버전: v0.5.0 (2026-10-02)
+버전: v0.6.0 (2026-10-02)
 변경 이력:
   v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본)
   v0.2.0  #4   이력 로그용 request.state.history
   v0.3.0  #6   판정 윈도우 WINDOW_SIZE(15) · 입력 25
   v0.4.0  #58  batch-test 반입량 = 업로드 중앙값 (#49)
   v0.5.0  #75  주석 토마토 · 원/kg 기준
+  v0.6.0  #84  Swagger 설명 토마토 실측 · batch-test 예측값 반올림
 
 [Day1 → Day3] 예측 API  —  serving_app/routers/predict.py
 【실습용】 ___ (밑줄 3개)만 채우세요. 채울 곳은 [빈칸 N] 으로 표시되어 있습니다.

@@ -2,9 +2,9 @@
 Day3 드리프트 감지 시뮬레이션 (119~123번 슬라이드).
 
 핵심 프로세스:
-    1) 기준 통계 산출   - 학습에 쓴 3년치 HAIC 데이터의 평균·표준편차 계산
-    2) 정상 입력 테스트 - 같은 분포의 데이터로 예측 -> RMSE $4 이내 확인 (베이스라인)
-    3) 드리프트 데이터 생성 - 변동성을 인위적으로 3배 키운 가격 데이터 생성
+    1) 기준 통계 산출   - 토마토 3년치 가격의 평균·일별 로그수익률 변동성 계산
+    2) 정상 입력 테스트 - 같은 분포의 데이터로 예측 -> RMSE 임계값 이내 확인
+    3) 폭염 데이터 생성 - 변동성을 인위적으로 3배 키운 가격 데이터 생성
     4) 드리프트 데이터 주입 - 생성한 데이터를 서빙 서버에 연속 요청으로 전송
     5) 결과 관찰       - RMSE 상승 -> 알림 로그 발생 -> 재학습 트리거 확인
 
@@ -39,11 +39,11 @@ TARGETS = {
 API_URL = f"{TARGETS['local']}/predict/batch-test"
 
 # 기준 통계용 데이터: 호스트의 data/uploads/ 에 업로드한 CSV가 없으면 학습에 쓰인 예시 데이터로 계산합니다.
-SAMPLE_CSV = "data/sample_haic_prices.csv"
+SAMPLE_CSV = "data/tomato_prices.csv"
 
 
 def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:
-    """1단계: 학습에 사용한 데이터(업로드된 최신 CSV)의 평균·표준편차."""
+    """1단계: 학습 데이터의 평균 가격·일별 로그수익률 표준편차."""
     if csv_path is None:
         try:
             csv_path = latest_upload()
@@ -52,19 +52,20 @@ def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:
             print(f"[info] 업로드된 CSV가 없어 {SAMPLE_CSV} 로 기준 통계를 계산합니다.")
     rows = load_rows(csv_path)
     closes = np.array([r["Close"] for r in rows])
-    return float(closes.mean()), float(closes.std())
+    return float(closes.mean()), float(np.diff(np.log(closes)).std())
 
 
 # SEQ_LEN(25) + WINDOW_SIZE(15) = 40개를 보내야 배치 하나당 정확히 WINDOW_SIZE(15)개의
 # (predicted, actual) 쌍이 쌓여, drift_detector.py가 바로 판정할 수 있다.
 BATCH_N = 40
 
-# 학습 데이터(실제 IBM 시세 기반)는 추세·모멘텀이 있는 시계열이라, 평균 주변의 순수
+# 토마토 가격은 추세·모멘텀이 있는 시계열이라, 평균 주변의 순수
 # 백색잡음(iid noise)을 넣으면 "정상" 입력조차 모델이 못 맞춰 오탐(false positive)이
 # 납니다. 그래서 정상/드리프트 배치 모두 일별 수익률(log return) 기반의 랜덤워크로
 # 만들고, 그 수익률의 표준편차(변동성)만 다르게 줍니다.
-NORMAL_SIGMA = 0.012  # 학습 데이터의 안정적 구간과 비슷한 일별 변동성 (~1.2%)
-DRIFT_SIGMA = NORMAL_SIGMA * 3  # 변동성을 3배 키운 드리프트
+DEFAULT_BASE_PRICE = 3722.87  # data/tomato_prices.csv 903거래일 평균 (원/kg)
+NORMAL_SIGMA = 0.121260  # 같은 데이터의 일별 로그수익률 표준편차
+DRIFT_SIGMA = NORMAL_SIGMA * 3  # 폭염 급등락을 재현하는 3배 변동성
 
 
 def _random_walk(n: int, base: float, sigma: float) -> np.ndarray:
@@ -72,13 +73,13 @@ def _random_walk(n: int, base: float, sigma: float) -> np.ndarray:
     return base * np.exp(np.cumsum(log_returns))
 
 
-def generate_normal_batch(n=BATCH_N, base=165.0, sigma=NORMAL_SIGMA):
+def generate_normal_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=NORMAL_SIGMA):
     """학습 데이터와 비슷한 변동성의 정상 입력(랜덤워크)."""
     return _random_walk(n, base, sigma)
 
 
-def generate_drift_batch(n=BATCH_N, base=165.0, sigma=DRIFT_SIGMA):
-    """변동성을 3배 키운 드리프트 입력 (의도적으로 오차 유발)."""
+def generate_drift_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=DRIFT_SIGMA):
+    """변동성을 3배 키운 폭염 입력 (의도적으로 오차 유발)."""
     return _random_walk(n, base, sigma)
 
 
@@ -99,18 +100,18 @@ def _summary(check: dict) -> str:
 
 def main():
     global API_URL
-    parser = argparse.ArgumentParser(description="HAIC 드리프트 감지 시뮬레이션")
+    parser = argparse.ArgumentParser(description="토마토 폭염 드리프트 감지 시뮬레이션")
     parser.add_argument("--target", choices=["local", "container", "both"], default="local",
                         help="local=8077, container=8099, both=같은 배치를 두 서버에 보내 비교")
     args = parser.parse_args()
     targets = ["local", "container"] if args.target == "both" else [args.target]
 
-    mean, std = compute_baseline_stats()
-    print(f"[1] 기준 통계: mean={mean:.2f}, std={std:.2f}")
+    mean, sigma = compute_baseline_stats()
+    print(f"[1] 토마토 기준 통계: mean={mean:.2f}원/kg, log_return_sigma={sigma:.6f}")
 
     # 배치는 한 번만 만든다: 두 서버에 "똑같은" 입력을 보내야 결과를 공정하게 비교할 수 있다.
-    normal_batch = generate_normal_batch(base=mean)
-    drift_batch = generate_drift_batch(base=mean)
+    normal_batch = generate_normal_batch(base=mean, sigma=sigma)
+    drift_batch = generate_drift_batch(base=mean, sigma=sigma * 3)
 
     results = {}
     for name in targets:
@@ -119,8 +120,8 @@ def main():
         try:
             print("[2] 정상 입력 테스트 전송...")
             normal = send_batch(normal_batch, label=f"{name}/normal")
-            print("[3-4] 드리프트 입력 주입...")
-            drift = send_batch(drift_batch, label=f"{name}/drift_injection")
+            print("[3-4] 폭염 입력 주입...")
+            drift = send_batch(drift_batch, label=f"{name}/heatwave_injection")
             results[name] = (normal["drift_check"], drift["drift_check"])
         except requests.exceptions.ConnectionError:
             print(f"[skip] {TARGETS[name]} 에 연결할 수 없습니다. 서버가 떠 있는지(/health) 확인하세요.")

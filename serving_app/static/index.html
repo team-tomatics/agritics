@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AIOps · HAIC 재학습 파이프라인</title>
+<title>농수산물 시세 예보 · 토마토 AIOps</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <style>
   :root {
@@ -117,8 +117,8 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#0a0c10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="brand-text">
-      <div class="title">AIOps · HAIC</div>
-      <div class="subtitle">드리프트 감지 기반 재학습 파이프라인</div>
+      <div class="title">토마토 시세 예보 AIOps</div>
+      <div class="subtitle">폭염 드리프트 감지 기반 재학습 파이프라인</div>
     </div>
   </div>
   <div class="nav-right">
@@ -131,11 +131,11 @@
   <!-- ================= 데이터 업로드 ================= -->
   <div class="card">
     <div class="section-head">
-      <h2>HAIC 데이터 업로드</h2>
+      <h2>토마토 데이터 업로드</h2>
       <p>
         <code>data/uploads/</code>는 여기서 업로드한 CSV만 쌓이는 곳입니다. 학습(<code>train_and_register.py</code> 등)은
-        항상 가장 최근에 올라온 파일을 사용합니다. <code>data/sample_haic_prices.csv</code>를 예시로 올려보세요
-        (컬럼: Date, Close, Volume · 최소 40행).
+        항상 가장 최근에 올라온 파일을 사용합니다. <code>data/tomato_prices.csv</code>를 예시로 올려보세요
+        (컬럼: Date, Close, Volume · 가격 단위: 원/kg · 최소 40행).
       </p>
     </div>
     <div class="upload-row">
@@ -150,13 +150,13 @@
     <div class="section-head">
       <h2>드리프트 시뮬레이션</h2>
       <p>
-        일별 수익률(log return) 기반 랜덤워크로 정상/드리프트 배치를 만들어 <code>/predict/batch-test</code>로 전송합니다.
-        드리프트 배치를 보내면 아래 파이프라인이 감지 → 재학습 → (게이트 통과 시) 재배포까지 진행됩니다.
+        토마토 일별 수익률(log return) 기반 랜덤워크로 정상/폭염 배치를 만들어 <code>/predict/batch-test</code>로 전송합니다.
+        폭염 배치를 보내면 아래 파이프라인이 감지 → 재학습 → (게이트 통과 시) 재배포까지 진행됩니다.
       </p>
     </div>
     <div class="btn-row">
       <button class="btn primary" onclick="sendBatch('normal')">정상 배치 전송</button>
-      <button class="btn danger" onclick="sendBatch('drift')">드리프트 배치 전송</button>
+      <button class="btn danger" onclick="sendBatch('drift')">폭염 배치 전송</button>
     </div>
     <div id="drift-status" style="margin-top:14px;"></div>
     <div id="drift-result" class="result-box"></div>
@@ -194,7 +194,7 @@
 
 </div>
 
-<footer>HAIC AIOps 실습 · 드리프트 감지 → 재학습 파이프라인 (serving_app/static/index.html)</footer>
+<footer>토마토 시세 예보 AIOps · 폭염 감지 → 재학습 파이프라인</footer>
 
 <script>
 /* ===================== 전역 상태 ===================== */
@@ -205,9 +205,9 @@ const RMSE_THRESHOLD = 4.0;
 
 let lastPipelineRun = null; // { driftCheck, clientRmse, ts }
 
-const NORMAL_SIGMA = 0.012;
+const NORMAL_SIGMA = 0.121260;
 const DRIFT_SIGMA = NORMAL_SIGMA * 3;
-const DEFAULT_BASE_PRICE = 165.0;
+const DEFAULT_BASE_PRICE = 3722.87;
 const PIPELINE_STAGES = [
   { key: "collect", title: "데이터 수집", desc: "요청 수신" },
   { key: "monitor", title: "데이터 모니터링", desc: "예측 기록 누적" },
@@ -388,7 +388,7 @@ async function sendBatch(kind) {
     }
     statusEl.innerHTML = `
       <span class="pill ${level}"><span class="dot"></span>${label}</span>
-      <span class="pill neutral" style="margin-left:6px;">클라이언트 계산 RMSE: $${clientRmse != null ? clientRmse.toFixed(2) : "-"}</span>`;
+      <span class="pill neutral" style="margin-left:6px;">클라이언트 계산 RMSE: ${clientRmse != null ? clientRmse.toFixed(2) : "-"}원/kg</span>`;
     showResult(resultBox, data, false);
   } catch (e) {
     statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>연결 실패</span>`;

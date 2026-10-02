@@ -28,8 +28,7 @@ GROUPS = {
         ("serving_app/monitoring/drift_detector.py", rf"^WINDOW_SIZE = {NUM}"),
         (HTML, rf"const WINDOW_SIZE = {NUM}"),
     ],
-    "RMSE 임계값 (게이트 = 드리프트)": [
-        ("serving_app/train_and_register.py", rf"^RMSE_GATE = {NUM}"),
+    "RMSE 임계값 (드리프트 판정)": [  # 배포 게이트는 #104 부터 WAPE_GATE
         ("serving_app/monitoring/drift_detector.py", rf"^RMSE_THRESHOLD = {NUM}"),
         (HTML, rf"const RMSE_THRESHOLD = {NUM}"),
     ],

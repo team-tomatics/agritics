@@ -162,6 +162,7 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 {"name": "aiops.log", "content": "2026-10-01 17:01:04,... [WARNING] [WARN] drift detected - triggering retrain\n..."}
 ```
 `aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`, 게이트 · 회귀 테스트에서 떨어지면 `[FAIL] new_rmse=... - gate/regression failed, keep current Production`.
+컨테이너 빌드 중 최초 Production 등록도 같은 `[OK]` 형식으로 기록되므로 첫 기동부터 대시보드에 v1 RMSE와 승격 이력이 표시된다.
 
 ---
 

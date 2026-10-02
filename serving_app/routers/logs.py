@@ -1,6 +1,6 @@
 """
 대시보드의 "재학습 로그" 패널용 - MLflow Registry를 조회하는 별도 이력 API 대신,
-monitoring/retrain_trigger.py의 "aiops" 로거가 그대로 기록하는 logs/aiops.log
+최초 학습과 재학습이 같은 형식으로 기록하는 logs/aiops.log
 파일을 읽기 전용으로 노출한다. 새 학습/승격 로직은 없다 (logging 설정은
 serving_app/main.py에서 앱 시작 시 한 번만 구성한다).
 

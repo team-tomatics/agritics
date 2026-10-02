@@ -2,12 +2,13 @@
 일일 보고서 생성 (기획서 ② GET /report · 운영 목표 "매일 07시 전 생성")
 
 작성자: 박유진
-버전: v1.3.0 (2026-10-02)
+버전: v1.4.0 (2026-10-02)
 변경 이력:
   v1.0.0  #16  로그 집계 → OpenAI 요약 · 실패 시 템플릿 보고서
   v1.1.0  #26  서비스 상태를 예측 요청 기준으로
   v1.2.0  #29  매일 06:00 KST 생성 (토마토 02:00 경매 기준)
   v1.3.0  #73  LLM 관측 check_report 에 source · error 전달 (민영은)
+  v1.4.0  #66  템플릿 보고서 마지막 줄 '예측값은 참고 정보…' (발표 8장)
 
 예측형 AI(LSTM) 의 이력을 생성형 AI(LLM) 가 사람이 읽는 문장으로 바꾼다.
   1) logs/history.jsonl · logs/aiops.log 에서 숫자를 **코드로** 계산한다 (collect_facts)
@@ -46,6 +47,7 @@ REPORT_DIR = "outputs/reports"
 PROMPT_PATH = "report_sidecar/prompts/report.md"
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 LOW_CONFIDENCE = "가격 급변 감지 — 오늘 예측 신뢰도 낮음"  # 기획서 3-3 알림 문구 (D 의 observe 가 이 문장을 검사)
+CLOSING_LINE = "예측값은 참고 정보이며 재고와 계약단가를 함께 확인하세요."  # prompts/report.md 마지막 줄 규칙과 같게 (#66)
 
 # A(심준용) 가 prompts/report.md 를 채우기 전까지 쓰는 기본 프롬프트. {키} 는 collect_facts() 의 키
 DEFAULT_PROMPT = """너는 외식 프랜차이즈 가맹점주와 본사 구매 담당자에게 {item_name} 도매 시세 일일 보고서를 쓰는 비서다.
@@ -185,6 +187,8 @@ def template_report(facts: dict, reason: str) -> str:
         f"- 서비스 상태: 예측 요청 {facts['request_count']}건 · 평균 응답 {facts['avg_latency_ms']} · 서버 에러율 {facts['error_rate']}",
         "",
         f"> 자동 문장 생성에 실패해 정해진 양식으로 만든 보고서입니다 ({reason}). 숫자는 같은 기록에서 나왔습니다.",
+        "",
+        CLOSING_LINE,
     ]
     return "\n".join(lines)
 

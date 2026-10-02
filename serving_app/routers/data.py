@@ -1,5 +1,4 @@
-"""
-HAIC 가상 데이터 업로드 - data/generate_haic_data.py로 자동 생성하던 방식을 대체합니다.
+"""토마토 가격·반입량 CSV 업로드와 최신 데이터 상태 조회.
 
 /data 폴더는 이 라우터로 업로드된 CSV만 쌓이는 곳입니다(data/uploads/). 여러 번
 업로드하면 계속 쌓이고, 학습(train_and_register.py, fine_tune 등)은 항상 가장
@@ -15,6 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from data.features import SEQ_LEN, load_rows
 from data.storage import UPLOAD_DIR, latest_upload
+from data.summary import summarize_price_volume_rows
 from data.validation import DataValidationError, parse_price_volume_csv
 from serving_app.monitoring.drift_detector import WINDOW_SIZE
 
@@ -37,7 +37,7 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(400, str(exc)) from exc
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    dest = os.path.join(UPLOAD_DIR, f"haic_{int(time.time())}.csv")
+    dest = os.path.join(UPLOAD_DIR, f"tomato_{int(time.time())}.csv")
     with open(dest, "w", encoding="utf-8", newline="") as f:
         f.write(text)
 
@@ -52,13 +52,8 @@ def status():
         return {"exists": False}
 
     rows = load_rows(path)
-    closes = [r["Close"] for r in rows]
     return {
         "exists": True,
         "filename": os.path.basename(path),
-        "rows": len(rows),
-        "start_date": rows[0]["Date"],
-        "end_date": rows[-1]["Date"],
-        "min_close": min(closes),
-        "max_close": max(closes),
+        **summarize_price_volume_rows(rows),
     }

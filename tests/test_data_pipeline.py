@@ -5,6 +5,7 @@ from datetime import date
 from io import StringIO
 from pathlib import Path
 
+from data.summary import summarize_price_volume_rows
 from data.validation import DataValidationError, parse_price_volume_csv
 from scripts.fetch_kamis import (
     close_statistics,
@@ -32,6 +33,25 @@ class DataValidationTests(unittest.TestCase):
     def test_negative_volume_is_rejected(self):
         with self.assertRaisesRegex(DataValidationError, "Volume은 0 이상"):
             parse_price_volume_csv(StringIO("Date,Close,Volume\n2026-09-29,3,-1\n"))
+
+    def test_summary_includes_price_and_volume_units(self):
+        summary = summarize_price_volume_rows(
+            [
+                {"Date": "2026-09-29", "Close": 3000.0, "Volume": 100.0},
+                {"Date": "2026-09-30", "Close": 4000.0, "Volume": 300.0},
+            ]
+        )
+
+        self.assertEqual(summary["rows"], 2)
+        self.assertEqual(summary["start_date"], "2026-09-29")
+        self.assertEqual(summary["end_date"], "2026-09-30")
+        self.assertEqual(summary["min_close"], 3000.0)
+        self.assertEqual(summary["max_close"], 4000.0)
+        self.assertEqual(summary["price_unit"], "원/kg")
+        self.assertEqual(summary["min_volume"], 100.0)
+        self.assertEqual(summary["max_volume"], 300.0)
+        self.assertEqual(summary["avg_volume"], 200.0)
+        self.assertEqual(summary["volume_unit"], "kg")
 
 
 class FetchKamisTests(unittest.TestCase):

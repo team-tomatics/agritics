@@ -14,6 +14,7 @@
 - 에러율 = 5xx 비율 (서버가 못 준 것). 4xx 는 client_error_rate 로 따로 센다
 """
 import json
+import logging
 import math
 import os
 import threading
@@ -21,6 +22,8 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Request
+
+logger = logging.getLogger("aiops")
 
 HISTORY_PATH = "logs/history.jsonl"
 TRACKED_PREFIXES = ("/predict", "/report")  # 정적 파일 · /docs · /health 는 기록하지 않는다
@@ -47,6 +50,13 @@ async def history_middleware(request: Request, call_next):
         response = await call_next(request)
         status = response.status_code
         return response
+    except Exception as exc:
+        logger.warning(
+            "[WARN] api exception path=%s exception_type=%s",
+            request.url.path,
+            type(exc).__name__,
+        )
+        raise
     finally:
         # 라우터에서 예외가 나도 500 으로 한 줄 남기고, 예외는 그대로 올려 보낸다
         entry = {

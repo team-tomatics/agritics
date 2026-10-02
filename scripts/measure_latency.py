@@ -1,6 +1,12 @@
 """
 [소유: B 서빙 · 박유진]  Lazy / Eager 지연 측정 (기획서 ② 응답 시간 "첫 요청 포함 1초 이내")
 
+작성자 : 박유진 (B 서빙 · Git)
+버전   : 1.0.0
+작성일 : 2026-10-01
+변경 이력
+  1.0.0  2026-10-01  최초 작성 — Lazy / Eager 3회 측정 (#22)
+
 모드마다 서버를 새 프로세스로 띄워(캐시 없는 상태) 아래를 잰다. 프로젝트 루트에서:
     python scripts/measure_latency.py                    # lazy · eager 각 3회, MODEL_SOURCE=mlflow
     python scripts/measure_latency.py --runs 5 --source local

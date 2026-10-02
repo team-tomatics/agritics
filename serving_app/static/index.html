@@ -413,7 +413,8 @@ function renderLogs(state, report) {
     : '<tr><td colspan="5" class="empty">아직 Production 승격 이력이 없습니다.</td></tr>';
 
   const alertEvents = state.events.filter((event) =>
-    event.line.includes("drift detected") || event.line.includes("retrain triggered") || event.line.includes("production promoted")
+    event.line.includes("drift detected") || event.line.includes("retrain triggered")
+      || event.line.includes("production promoted") || event.line.includes("[FAIL]")
   ).slice(-8).reverse();
   document.getElementById("alert-list").innerHTML = alertEvents.length
     ? alertEvents.map((event) => `<div class="alert">${pill(event.level.toUpperCase(), event.level)}<div class="alert-body">${escapeHtml(event.line.replace(/^.*?\[(?:WARNING|INFO|ERROR)\]\s*/, ""))}<div class="alert-time">${escapeHtml(formatTime(event.timestamp))}</div></div></div>`).join("")
@@ -433,11 +434,13 @@ function renderPipeline() {
     else states = ["ok", "ok", "ok", "idle", "idle", "idle", "idle"];
   } else if (latestLogState.events.length) {
     const last = latestLogState.events.filter((event) =>
-      event.line.includes("drift detected") || event.line.includes("retrain triggered") || event.line.includes("production promoted")
+      event.line.includes("drift detected") || event.line.includes("retrain triggered")
+        || event.line.includes("production promoted") || event.line.includes("[FAIL]")
     ).at(-1);
     if (!last) return;
     label = relativeTime(last.timestamp);
     if (last.line.includes("production promoted")) states = ["ok", "ok", "warn", "ok", "ok", "ok", "ok"];
+    else if (last.line.includes("[FAIL]")) states = ["ok", "ok", "warn", "ok", "ok", "warn", "idle"];
     else if (latestLogState.driftActive) states = ["ok", "ok", "warn", "ok", "idle", "idle", "idle"];
   }
   document.getElementById("pipeline-run-badge").textContent = label;

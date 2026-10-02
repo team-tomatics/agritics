@@ -3,9 +3,15 @@
 【실습용】 ___ (밑줄 3개)만 채우세요. 채울 곳은 [빈칸 N] 으로 표시되어 있습니다.
    ___ 가 남은 채 실행하면 "name '___' is not defined" 에러가 나며, 그 줄이 채울 곳입니다.
 
+작성자: 민영은 (원본: 교수님 스켈레톤)
+버전: v0.2.0 (2026-10-02)
+변경 이력:
+  v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본) · 임계값 612원/kg (#45) · 윈도우 15 (#6)
+  v0.2.0  #105 판정을 최근 15건 RMSE > 612원/kg → WAPE > 18% 로 (교수님 안내: 드리프트 탐지 = WAPE)
+
 ■ 이 파일이 하는 일 (한 줄 요약)
-   "최근 모델이 평균 몇 원/kg씩 틀리고 있는지(RMSE)"를 계산해서,
-   612원/kg보다 많이 틀리면 "데이터가 달라졌다(드리프트)"고 판단합니다.
+   "최근 예측이 실제 가격에서 몇 % 빗나갔는지(WAPE)"를 계산해서,
+   18%보다 많이 빗나가면 "데이터가 달라졌다(드리프트)"고 판단합니다.
 
 ■ 드리프트가 뭔가요?
    모델은 과거 데이터로 공부했습니다. 그런데 시장 상황이 갑자기 바뀌면(예: 변동성 폭증)
@@ -13,28 +19,35 @@
    그래서 최근 예측이 얼마나 틀렸는지 계속 지켜보다가, 너무 많이 틀리면 재학습을 시작합니다.
 
 ■ 판단 기준
-   최근 15건(약 2.5주 거래일)의 RMSE > 612원/kg  →  드리프트!
+   최근 15건(약 3주 거래일)의 WAPE > 18%  →  드리프트!
+   · WAPE = Σ|실제 − 예측| ÷ Σ실제 × 100  (scripts/gate_metrics.py 의 wape() 와 같은 정의)
+   · 원/kg 오차(RMSE)는 가격이 비쌀 때 커 보이고 쌀 때 작아 보입니다. WAPE 는 가격 수준과 상관없는
+     비율이라 1년 내내 같은 기준으로 판정할 수 있습니다. (배포 게이트는 RMSE 612원/kg 그대로 — C)
+   · 18% = 평시 15건 WAPE 상위 5% (#102 scripts/drift_wape_threshold.py)
    · 15건보다 짧으면 : 우연한 한두 번 실수에도 경보가 울립니다.
    · 15건보다 길면   : 상황이 바뀌어도 늦게 알아챕니다.
    (팀: 토마토 3년 급등 10건 기준 15일 6건 감지 · 오탐 3.5%, 21일은 4건 — 기획서 3-6)
 
 ■ 이 파일의 빈칸 : [빈칸 7] compute_rmse   [빈칸 8] is_drift
 """
-RMSE_THRESHOLD = 612.0  # 원/kg — 게이트와 같은 값 (기획서 3-2, #45)
+WAPE_THRESHOLD = 18.0  # % — 드리프트 기준 (#105). index.html 의 WAPE_THRESHOLD 와 같게
 WINDOW_SIZE = 15       # 최근 15건을 봅니다 (기획서 3-6)
+# 이전 드리프트 기준(원/kg). 판정에는 쓰지 않는다 — check_constants 의 게이트 · 드리프트 묶음이 분리되면(#104) 지운다
+RMSE_THRESHOLD = 612.0
 
 
 def compute_rmse(recent_predictions: list[dict]) -> float:
     """
     받는 것  : [{"predicted": 100.0, "actual": 102.0}, {"predicted": 100.0, "actual": 98.0}, ...]
-    돌려줄 것: RMSE (숫자 1개, "평균 몇 달러 틀렸나").  빈 목록이면 0.0
+    돌려줄 것: RMSE (숫자 1개, "평균 몇 원/kg 틀렸나").  빈 목록이면 0.0
+              판정은 compute_wape 로 합니다 (#105). RMSE 는 배포 게이트와 같은 단위의 참고값입니다.
 
     ■ RMSE 계산 4단계 — 먼저 손으로 풀어 보세요
                              1건째            2건째
        ① 오차 (실제-예측)    102-100 = +2     98-100 = -2
        ② 제곱               2² = 4           (-2)² = 4
        ③ 평균               (4 + 4) / 2 = 4
-       ④ 제곱근             √4 = 2.0         → "평균 2달러 틀렸다"
+       ④ 제곱근             √4 = 2.0         → "평균 2원/kg 틀렸다"
 
     확인 방법
       python -c "from serving_app.monitoring.drift_detector import compute_rmse; \
@@ -55,15 +68,42 @@ def compute_rmse(recent_predictions: list[dict]) -> float:
     #
     #   생각해 볼 질문
     #     · 이미 적힌 ** 2 를 빼고 오차를 그냥 평균 내면, 위 예시의 결과는 몇이 되나요? 그게 맞는 판단일까요?
-    #     · 이미 적힌 math.sqrt 를 빼면 단위가 "달러"일까요, "달러²"일까요? 기준 $4.00 과 비교할 수 있을까요?
+    #     · 이미 적힌 math.sqrt 를 빼면 단위가 "원/kg"일까요, "(원/kg)²"일까요? 게이트 612원/kg 과 비교할 수 있을까요?
     errors_sq = [(p["actual"] - p["predicted"]) ** 2 for p in recent_predictions]
     return math.sqrt(sum(errors_sq) / len(errors_sq))
+
+
+def compute_wape(recent_predictions: list[dict]) -> float:
+    """
+    받는 것  : [{"predicted": 3300.0, "actual": 3000.0}, {"predicted": 3600.0, "actual": 4000.0}, ...]
+    돌려줄 것: WAPE (%, "실제 가격 합계 대비 오차 합계").  빈 목록이면 0.0
+
+    ■ WAPE 계산 3단계
+       ① 오차 합계   |3000 - 3300| + |4000 - 3600| = 300 + 400 = 700
+       ② 실제 합계   3000 + 4000 = 7000
+       ③ 비율        700 ÷ 7000 × 100 = 10.0%   → "실제 가격의 10% 만큼 빗나갔다"
+
+    날마다 나누는 MAPE 와 달리, 싼 날 · 비싼 날이 금액만큼만 기여합니다.
+
+    확인 방법
+      python -c "from serving_app.monitoring.drift_detector import compute_wape; \
+      print(compute_wape([{'predicted':3300,'actual':3000},{'predicted':3600,'actual':4000}])); \
+      print(compute_wape([]))"
+      → 10.0 과 0.0 이 나오면 성공
+    """
+    if not recent_predictions:
+        return 0.0
+    actual_sum = sum(p["actual"] for p in recent_predictions)
+    if actual_sum <= 0:  # 가격은 schemas.py 가 > 0 으로 막지만, 0 나누기는 여기서도 막는다
+        return 0.0
+    error_sum = sum(abs(p["actual"] - p["predicted"]) for p in recent_predictions)
+    return error_sum / actual_sum * 100
 
 
 def is_drift(recent_predictions: list[dict]) -> bool:
     """
     드리프트인지 True/False 로 판단합니다.
-    흐름: (데이터 충분한가?) → 최근 21건만 골라서 → RMSE 계산 → 기준($4)보다 크면 드리프트
+    흐름: (데이터 충분한가?) → 최근 15건만 골라서 → WAPE 계산 → 기준(18%)보다 크면 드리프트
     """
     # ════════════════════════════ [빈칸 8] ════════════════════════════
     # "아직 판단하지 않는다(False)"로 끝내야 하는 조건을 채우세요.
@@ -74,5 +114,4 @@ def is_drift(recent_predictions: list[dict]) -> bool:
     if len(recent_predictions) < WINDOW_SIZE:
         return False  # 아직 판단할 만큼 데이터가 쌓이지 않음
     window = recent_predictions[-WINDOW_SIZE:]
-    rmse = compute_rmse(window)
-    return rmse > RMSE_THRESHOLD
+    return compute_wape(window) > WAPE_THRESHOLD

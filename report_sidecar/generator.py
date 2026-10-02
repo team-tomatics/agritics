@@ -204,8 +204,9 @@ def generate() -> dict:
     # D(민영은) 의 LLM 관측 — 구현되면 여기서 경고를 남긴다 (생성 실패 · 30초 초과 · 신뢰도 문구 누락)
     try:
         from report_sidecar.observe import check_report
-        check_report(markdown, facts["drift_detected"], elapsed)
-    except NotImplementedError:
+        check_report(markdown, facts["drift_detected"], elapsed, source=source, error=error)
+    except Exception:
+        # 관측 실패가 보고서 생성 자체를 막지 않도록 사이드카 본문은 그대로 제공한다.
         pass
     return meta
 

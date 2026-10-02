@@ -30,7 +30,8 @@ from data.storage import latest_upload
 from serving_app.lstm_model import build_model
 
 # 시드 고정: LSTM 가중치 초기화가 랜덤이라 시드 없이는 실행마다 RMSE가 크게 흔들려
-# (관찰치: 2.22~5.29) 게이트($4.00) 통과 여부가 운에 좌우됩니다. numpy/tensorflow/python
+# (토마토 실측: 시드 42 · 1 · 7 · 123 · 2026 → 540.0 · 487.6 · 510.4 · 488.7 · 499.6원/kg, 기획서 3-6)
+# 게이트(612원/kg)는 모두 통과하지만 단순 예측(529.9)보다 나은지는 시드에 좌우됩니다. numpy/tensorflow/python
 # random을 한 번에 고정해 재현 가능한 학습 결과를 보장합니다.
 SEED = 42
 keras.utils.set_random_seed(SEED)

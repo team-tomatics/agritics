@@ -63,7 +63,7 @@ class PriceVolumeScaler:
         return self._scale(close, self.close_min, self.close_max)
 
     def inverse_close(self, scaled_close: float) -> float:
-        """모델이 뱉은 정규화된 예측값을 실제 달러 단위 종가로 되돌린다."""
+        """모델이 뱉은 정규화된 예측값을 실제 원/kg 도매가격으로 되돌린다."""
         return self._unscale(scaled_close, self.close_min, self.close_max)
 
     def save(self, path: str = "serving_app/models/scaler.pkl"):

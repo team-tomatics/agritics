@@ -29,7 +29,7 @@
 
 요청
 ```json
-{"sequence": [{"close": 3750.0, "volume": 120}, ... 25개]}
+{"sequence": [{"close": 4599.0, "volume": 158977}, {"close": 3817.0, "volume": 210513}, ... 25개]}
 ```
 | 필드 | 타입 | 규칙 |
 |---|---|---|
@@ -57,22 +57,24 @@
 
 ## POST /predict/batch-test
 
-드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, 최근 15건 RMSE 로 드리프트를 판정한다. 반입량은 고정값.
+드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, 최근 15건 RMSE 가 612원/kg 을 넘으면 드리프트로 판정한다. 반입량은 최근 업로드 CSV 의 중앙값(토마토 136,449kg, #49).
 
 요청 (보통 40개 = 25 + 15, `scripts/simulate_drift.py`)
 ```json
-{"prices": [165.0, 166.2, ... 40개]}
+{"prices": [2833.0, 2850.0, 2920.0, ... 40개]}
 ```
-응답 200
+응답 200 — 평온 구간 (실제 2025-03-28 ~ 05-13 40거래일)
 ```json
-{"predictions": [ ... 15개 ],
+{"predictions": [2539.5, 2492.9, 2439.9, ... 15개],
  "drift_check": {"status": "ok"}}
 ```
-드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트 → 승격
+드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트(612원/kg) · 회귀 테스트 → 통과하면 승격. 아래는 실제 2026-08-13 ~ 09-30 급등 구간 — 재학습한 모델도 게이트를 못 넘어 **기존 Production 유지**
 ```json
-{"predictions": [ ... 15개 ],
- "drift_check": {"status": "retrain_triggered", "promoted": true, "rmse": 1.45}}
+{"predictions": [4230.1, 4628.2, 4998.2, ... 15개],
+ "drift_check": {"status": "retrain_triggered", "promoted": false, "rmse": 1258.41}}
 ```
+통과하면 `"promoted": true` 와 새 `"rmse"` · 다음 `/predict` 의 `model_version` 이 `production-v2` 로 바뀐다
+(10/2 토마토 Production 모델 실측)
 - 승격되면 서버 모델 캐시를 비워 **다음 `/predict` 부터 새 버전**으로 응답한다 (기획서 3-4)
 - 재학습은 요청 안에서 동기로 돈다 (약 8초) — 기획서 3-4 #8 한계
 
@@ -159,7 +161,7 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 ```json
 {"name": "aiops.log", "content": "2026-10-01 17:01:04,... [WARNING] [WARN] drift detected - triggering retrain\n..."}
 ```
-`aiops.log` 순서: `[WARN] drift detected` → `[INFO] retrain triggered (window=last_25_days)` → `[OK] new_rmse=1.45 - production promoted: <모델> v4`
+`aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`. 게이트 · 회귀 테스트에서 떨어지면 지금은 **로그가 남지 않는다** (위 급등 예시 — D 에 공유)
 
 ---
 

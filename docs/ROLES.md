@@ -109,7 +109,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | 승격 시 이전 Production → Archived (롤백 대상 명확) | `train_and_register.py` | 3-4 |
 | (선택) 성능 회귀 테스트 — 새 RMSE ≤ 현재 Production RMSE | `train_and_register.py` | 3-1 |
 
-**먼저 할 것**: 컨테이너가 HAIC 그대로 한 번 뜨는지 확인 → 모델 이름 PR.
+**완료** (10/2): 모델 이름 #11 · 시드 CSV 토마토 + 게이트 612 #57 · 컨테이너 토마토 학습 540.04 통과.
 
 ### D 민영은 — 모니터링
 
@@ -164,7 +164,7 @@ B history.jsonl 형식 ──┬──▶ B 5분 집계 ──▶ D 지연 · �
 C 모델 이름 변경 ──▶ (B model_loader 리뷰 · D retrain_trigger 문구 리뷰)
 ```
 
-**병목은 A 의 CSV 와 임계값**입니다. 그동안 B · C · D 는 HAIC 샘플로 각자 기능을 먼저 만들고, 값만 나중에 바꿉니다.
+~~병목: A 의 CSV 와 임계값~~ → **해결 (10/2)**: 반입량 포함 토마토 CSV #40 · 임계값 612원/kg 확정 #45.
 
 ---
 

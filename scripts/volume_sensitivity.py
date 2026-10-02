@@ -3,7 +3,8 @@
 
 작성자: 박유진
 버전: v1.0.0 (2026-10-02)
-변경: #68 최초 작성
+변경 이력:
+  v1.0.0  #68  요일 보정 데이터 분석 + /predict what-if
 
 프로젝트 루트에서 (표준 라이브러리만 사용)
     python3 scripts/volume_sensitivity.py analyze                       # 1) 데이터: 반입량이 줄었던 날 → 다음날 가격

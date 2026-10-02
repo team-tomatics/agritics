@@ -3,405 +3,580 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>농수산물 시세 예보 · 토마토 AIOps</title>
+<title>토마토 시세 예보 · AIOps 운영 대시보드</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <style>
   :root {
-    --bg: #0a0c10;
-    --panel: #12151c;
-    --panel-2: #171b25;
-    --border: #262b38;
-    --text: #eef1f7;
-    --muted: #9aa4b8;
-    --faint: #5b6478;
-    --accent: #6c8dff;
-    --accent-soft: rgba(108, 141, 255, 0.16);
-    --ok: #3ddc97;
-    --ok-soft: rgba(61, 220, 151, 0.14);
-    --warn: #f5b64c;
-    --warn-soft: rgba(245, 182, 76, 0.14);
-    --err: #ff6b6b;
-    --err-soft: rgba(255, 107, 107, 0.14);
-    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --bg: #f5f6fb;
+    --panel: #fff;
+    --border: #e2e5ee;
+    --text: #202432;
+    --muted: #70788c;
+    --accent: #3657e9;
+    --accent-soft: #edf0ff;
+    --ok: #1aa85b;
+    --ok-soft: #eaf8f0;
+    --warn: #c57600;
+    --warn-soft: #fff4df;
+    --err: #d63c47;
+    --err-soft: #ffedef;
+    --mono: "SFMono-Regular", Consolas, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  button, input { font: inherit; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #9eafff; outline-offset: 2px; }
 
   .topnav {
-    display: flex; align-items: center; gap: 14px; justify-content: space-between;
-    background: var(--panel); border-bottom: 1px solid var(--border);
-    padding: 0 20px; height: 60px; position: sticky; top: 0; z-index: 10;
+    min-height: 64px; padding: 0 24px; display: flex; align-items: center; gap: 28px;
+    background: var(--panel); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
   }
-  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: max-content; }
   .brand-mark {
-    width: 34px; height: 34px; border-radius: 9px;
-    background: linear-gradient(135deg, var(--accent), #a9bdff);
-    display: flex; align-items: center; justify-content: center; color: #0a0c10;
-    flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    color: #fff; background: linear-gradient(135deg, #3153e8, #6684ff);
   }
-  .brand-text .title { font-weight: 700; font-size: 1.02rem; line-height: 1.2; }
-  .brand-text .subtitle { font-size: 0.72rem; color: var(--muted); }
-  .nav-right { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--muted); }
+  .brand-title { font-weight: 800; font-size: .96rem; }
+  .brand-subtitle { color: var(--muted); font-size: .69rem; margin-top: 2px; }
+  .tabs { align-self: stretch; display: flex; gap: 6px; }
+  .tab {
+    border: 0; border-bottom: 2px solid transparent; color: var(--muted);
+    background: transparent; padding: 0 14px; font-weight: 700; cursor: pointer;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-meta { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .76rem; }
+
+  .page { max-width: 1240px; margin: 0 auto; padding: 18px 22px 34px; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(35, 43, 72, .03);
+  }
+  .section { padding: 18px; margin-bottom: 14px; }
+  .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 15px; }
+  h2 { margin: 0; font-size: 1rem; }
+  .help { margin: 4px 0 0; color: var(--muted); font-size: .79rem; line-height: 1.5; }
+  code { font-family: var(--mono); background: #f0f2f7; padding: 1px 5px; border-radius: 4px; }
+
+  .filters { display: flex; gap: 6px; }
+  .filter, .btn {
+    border: 1px solid var(--border); border-radius: 8px; background: #fff;
+    color: var(--text); padding: 7px 11px; font-size: .78rem; font-weight: 700; cursor: pointer;
+  }
+  .filter.active, .btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .btn.danger { border-color: #f0b9bd; background: var(--err-soft); color: var(--err); }
+  .btn:disabled { opacity: .55; cursor: wait; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .metric { min-height: 122px; padding: 16px; }
+  .metric-label { color: var(--muted); font-size: .75rem; font-weight: 700; }
+  .metric-value { margin: 12px 0 7px; font-size: 1.65rem; line-height: 1; font-weight: 800; letter-spacing: -.04em; }
+  .metric-meta { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+  .metric[data-state="error"] .metric-value { color: var(--err); font-size: 1rem; letter-spacing: 0; }
+  .metric[data-state="warn"] .metric-value { color: var(--warn); }
+  .metric[data-state="ok"] .metric-value { color: var(--ok); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr); gap: 14px; }
+  .pipeline-track { display: grid; grid-template-columns: repeat(7, 1fr); overflow-x: auto; }
+  .stage { min-width: 100px; text-align: center; position: relative; padding: 4px 6px; }
+  .stage:not(:last-child)::after {
+    content: ""; position: absolute; top: 20px; left: 65%; width: 70%; height: 2px; background: var(--border);
+  }
+  .stage-icon {
+    position: relative; z-index: 1; margin: 0 auto 8px; width: 36px; height: 36px; border: 2px solid var(--border);
+    border-radius: 50%; display: grid; place-items: center; background: #fff; font-size: .85rem; font-weight: 800;
+  }
+  .stage.ok .stage-icon { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+  .stage.warn .stage-icon { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+  .stage-title { font-size: .74rem; font-weight: 800; }
+  .stage-desc, .stage-status { margin-top: 3px; color: var(--muted); font-size: .66rem; }
+  .stage.ok .stage-status { color: var(--ok); }
+  .stage.warn .stage-status { color: var(--warn); }
+
   .pill {
-    display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
-    font-size: 0.74rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px;
+    background: #eff1f6; color: var(--muted); font-size: .7rem; font-weight: 800;
   }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .pill.ok { background: var(--ok-soft); color: var(--ok); }
   .pill.warn { background: var(--warn-soft); color: var(--warn); }
   .pill.err { background: var(--err-soft); color: var(--err); }
-  .pill.neutral { background: var(--panel-2); color: var(--muted); }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .facts { display: grid; gap: 9px; margin-top: 14px; }
+  .fact { display: flex; justify-content: space-between; gap: 12px; font-size: .78rem; }
+  .fact span:first-child { color: var(--muted); }
+  .fact strong { text-align: right; word-break: break-all; }
 
-  .page { max-width: 980px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .76rem; }
+  th { color: var(--muted); font-size: .68rem; text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 8px; border-bottom: 1px solid #eff1f6; }
+  tr:last-child td { border-bottom: 0; }
+  .empty { padding: 18px 4px; text-align: center; color: var(--muted); font-size: .76rem; }
+  .alerts { display: grid; gap: 8px; }
+  .alert { display: grid; grid-template-columns: auto 1fr; gap: 9px; padding: 9px 0; border-bottom: 1px solid #eff1f6; }
+  .alert:last-child { border-bottom: 0; }
+  .alert-body { min-width: 0; font-size: .73rem; line-height: 1.45; word-break: break-word; }
+  .alert-time { color: var(--muted); font-size: .64rem; margin-top: 3px; }
 
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-    padding: 18px 20px;
+  .panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .status-line { margin: 12px 0; min-height: 25px; }
+  input[type="file"] { max-width: 100%; color: var(--muted); font-size: .78rem; }
+  .result {
+    display: none; margin-top: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: #f8f9fc; font: .72rem/1.55 var(--mono);
   }
-  .section-head { margin-bottom: 14px; }
-  .section-head h2 { margin: 0 0 3px; font-size: 1.05rem; }
-  .section-head p { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
-  .section-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .result.show { display: block; }
+  .result.error { border-color: #f1bdc1; background: var(--err-soft); }
+  footer { padding: 22px; text-align: center; color: var(--muted); font-size: .7rem; }
 
-  .btn { border: none; border-radius: 9px; padding: 9px 14px; font-size: 0.83rem; font-weight: 700; cursor: pointer; }
-  .btn.primary { background: var(--accent); color: #0a0c10; }
-  .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  .btn.danger { background: var(--err); color: #1a0a0a; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
-
-  /* ---------- Upload ---------- */
-  .upload-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  input[type="file"] {
-    color: var(--muted); font-size: 0.82rem; max-width: 100%;
+  @media (max-width: 980px) {
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .metric:last-child { grid-column: span 2; }
+    .layout, .panel-grid { grid-template-columns: 1fr; }
+    .nav-meta .clock { display: none; }
   }
-
-  /* ---------- Pipeline ---------- */
-  .pipeline-meta { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--muted); }
-  .pipeline-track { display: flex; align-items: stretch; overflow-x: auto; padding: 2px 2px 4px; gap: 0; }
-  .pipe-stage { flex: 1; min-width: 110px; text-align: center; padding: 10px 10px; border-left: 1px solid var(--border); }
-  .pipe-stage:first-child { border-left: none; }
-  .pipe-title { font-size: 0.82rem; font-weight: 700; color: var(--faint); }
-  .pipe-stage.ok .pipe-title, .pipe-stage.warn .pipe-title { color: var(--text); }
-  .pipe-desc { font-size: 0.7rem; color: var(--muted); margin: 2px 0 6px; line-height: 1.4; }
-  .pipe-status { font-size: 0.7rem; font-weight: 700; }
-  .pipe-stage.ok .pipe-status { color: var(--ok); }
-  .pipe-stage.warn .pipe-status { color: var(--warn); }
-  .pipe-stage.idle .pipe-status { color: var(--faint); }
-
-  /* ---------- Tables ---------- */
-  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
-  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.74rem; text-transform: uppercase;
-       letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
-  tr:last-child td { border-bottom: none; }
-  .table-empty { color: var(--faint); font-size: 0.82rem; padding: 20px 4px; text-align: center; }
-
-  .result-box {
-    margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--panel-2);
-    border: 1px solid var(--border); font-family: var(--mono); font-size: 0.8rem;
-    white-space: pre-wrap; word-break: break-word; display: none; max-height: 260px; overflow-y: auto;
+  @media (max-width: 680px) {
+    .topnav { padding: 10px 14px 0; gap: 8px; flex-wrap: wrap; }
+    .brand-subtitle, .nav-meta { display: none; }
+    .tabs { flex: 0 0 100%; min-width: 0; height: 44px; order: 3; }
+    .tab { flex: 1; min-width: 0; padding: 0 5px; }
+    .page { padding: 12px; }
+    .section-head { flex-direction: column; }
+    .metrics-grid { grid-template-columns: 1fr; }
+    .metric:last-child { grid-column: auto; }
   }
-  .result-box.show { display: block; }
-
-  code { font-family: var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
-  footer { color: var(--faint); font-size: 0.76rem; text-align: center; margin: 26px 0 10px; }
 </style>
 </head>
 <body>
-
-<div class="topnav">
+<header class="topnav">
   <div class="brand">
-    <div class="brand-mark">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#0a0c10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-    <div class="brand-text">
-      <div class="title">토마토 시세 예보 AIOps</div>
-      <div class="subtitle">폭염 드리프트 감지 기반 재학습 파이프라인</div>
+    <div class="brand-mark" aria-hidden="true">↗</div>
+    <div>
+      <div class="brand-title">토마토 AIOps</div>
+      <div class="brand-subtitle">가격 예측 모델 운영 현황</div>
     </div>
   </div>
-  <div class="nav-right">
-    <span class="pill neutral">MODEL_SOURCE=mlflow 기준</span>
+  <nav class="tabs" aria-label="대시보드 메뉴">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="simulation">Simulation</button>
+    <button class="tab" data-view="datasets">Datasets</button>
+  </nav>
+  <div class="nav-meta">
+    <span class="clock" id="clock"></span>
+    <span class="pill">MODEL_SOURCE=mlflow 기준</span>
   </div>
-</div>
+</header>
 
-<div class="page">
-
-  <!-- ================= 데이터 업로드 ================= -->
-  <div class="card">
+<main class="page">
+  <section class="view active" id="view-dashboard">
     <div class="section-head">
-      <h2>토마토 데이터 업로드</h2>
-      <p>
-        <code>data/uploads/</code>는 여기서 업로드한 CSV만 쌓이는 곳입니다. 학습(<code>train_and_register.py</code> 등)은
-        항상 가장 최근에 올라온 파일을 사용합니다. <code>data/tomato_prices.csv</code>를 예시로 올려보세요
-        (컬럼: Date, Close, Volume · 가격 단위: 원/kg · 최소 40행).
-      </p>
-    </div>
-    <div class="upload-row">
-      <input type="file" id="upload-input" accept=".csv" />
-      <button class="btn primary" onclick="uploadFile()">업로드</button>
-    </div>
-    <div id="upload-status" style="margin-top:10px;"></div>
-  </div>
-
-  <!-- ================= 드리프트 시뮬레이션 ================= -->
-  <div class="card">
-    <div class="section-head">
-      <h2>드리프트 시뮬레이션</h2>
-      <p>
-        토마토 일별 수익률(log return) 기반 랜덤워크로 정상/폭염 배치를 만들어 <code>/predict/batch-test</code>로 전송합니다.
-        폭염 배치를 보내면 아래 파이프라인이 감지 → 재학습 → (게이트 통과 시) 재배포까지 진행됩니다.
-      </p>
-    </div>
-    <div class="btn-row">
-      <button class="btn primary" onclick="sendBatch('normal')">정상 배치 전송</button>
-      <button class="btn danger" onclick="sendBatch('drift')">폭염 배치 전송</button>
-    </div>
-    <div id="drift-status" style="margin-top:14px;"></div>
-    <div id="drift-result" class="result-box"></div>
-  </div>
-
-  <!-- ================= 파이프라인 ================= -->
-  <div class="card">
-    <div class="section-head-row">
-      <div class="section-head">
-        <h2>드리프트 감지 기반 재학습 파이프라인</h2>
-        <p>위에서 배치를 보내면, 그 요청이 실제로 거쳐간 단계를 아래에 표시합니다 (자동 스케줄러는 없고, 수동 트리거 방식입니다).</p>
+      <div>
+        <h2>운영 지표 요약</h2>
+        <p class="help"><code>/predict</code> 실제 요청을 선택한 구간으로 집계합니다. 요청이 없으면 값은 표시하지 않습니다.</p>
       </div>
-      <div class="pipeline-meta">
-        <span class="pill neutral" id="pipeline-run-badge">아직 실행 안 함</span>
+      <div class="filters" aria-label="지표 집계 구간">
+        <button class="filter active" data-minutes="5">5분</button>
+        <button class="filter" data-minutes="60">1시간</button>
+        <button class="filter" data-minutes="360">6시간</button>
+        <button class="filter" data-minutes="1440">24시간</button>
       </div>
     </div>
-    <div class="pipeline-track" id="pipeline-track"></div>
-  </div>
 
-  <!-- ================= 재학습 로그 ================= -->
-  <div class="card">
-    <div class="section-head-row">
-      <div class="section-head">
-        <h2>재학습 로그</h2>
-        <p>
-          드리프트 감지·재학습 트리거는 <code>logs/aiops.log</code>에 그대로 기록됩니다.
-          <code>[WARN] drift detected</code> → <code>[INFO] retrain triggered</code> →
-          <code>[OK] new_rmse=... promoted</code> 순서로 남는지 아래에서 직접 열어 확인하세요.
-        </p>
-      </div>
+    <div class="metrics-grid">
+      <article class="card metric" id="metric-requests"><div class="metric-label">요청 수</div><div class="metric-value">—</div><div class="metric-meta">불러오는 중</div></article>
+      <article class="card metric" id="metric-latency"><div class="metric-label">평균 응답시간</div><div class="metric-value">—</div><div class="metric-meta">불러오는 중</div></article>
+      <article class="card metric" id="metric-success"><div class="metric-label">성공률</div><div class="metric-value">—</div><div class="metric-meta">불러오는 중</div></article>
+      <article class="card metric" id="metric-rmse"><div class="metric-label">최근 모델 RMSE</div><div class="metric-value">—</div><div class="metric-meta">승격 로그 기준</div></article>
+      <article class="card metric" id="metric-drift"><div class="metric-label">드리프트 상태</div><div class="metric-value">—</div><div class="metric-meta">로그 및 최신 보고서 기준</div></article>
     </div>
-    <div class="btn-row" id="log-file-list"></div>
-    <div id="log-content" class="result-box"></div>
-  </div>
 
-</div>
+    <div class="layout" style="margin-top:14px;">
+      <div>
+        <section class="card section">
+          <div class="section-head">
+            <div>
+              <h2>드리프트 감지 기반 재학습 파이프라인</h2>
+              <p class="help">시뮬레이션 실행 결과 또는 <code>aiops.log</code>의 마지막 이벤트를 반영합니다.</p>
+            </div>
+            <span class="pill" id="pipeline-run-badge">기록 확인 중</span>
+          </div>
+          <div class="pipeline-track" id="pipeline-track"></div>
+        </section>
 
-<footer>토마토 시세 예보 AIOps · 폭염 감지 → 재학습 파이프라인</footer>
+        <section class="card section">
+          <div class="section-head">
+            <div><h2>모델 승격 이력</h2><p class="help">Production 승격 성공 로그만 표시합니다.</p></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>시각</th><th>모델</th><th>버전</th><th>RMSE</th><th>스테이지</th></tr></thead>
+              <tbody id="model-history"><tr><td colspan="5" class="empty">불러오는 중</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside>
+        <section class="card section">
+          <div class="section-head">
+            <h2>현재 운영 모델</h2>
+            <span class="pill" id="health-badge">확인 중</span>
+          </div>
+          <div class="facts">
+            <div class="fact"><span>모델</span><strong id="current-model">—</strong></div>
+            <div class="fact"><span>버전</span><strong id="current-version">—</strong></div>
+            <div class="fact"><span>로딩 모드</span><strong id="loading-mode">—</strong></div>
+            <div class="fact"><span>RMSE 게이트</span><strong id="rmse-gate">—</strong></div>
+          </div>
+        </section>
+
+        <section class="card section">
+          <div class="section-head"><div><h2>최근 알림</h2><p class="help"><code>aiops.log</code> 원문 기준</p></div></div>
+          <div class="alerts" id="alert-list"><div class="empty">불러오는 중</div></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <section class="view" id="view-simulation">
+    <div class="panel-grid">
+      <section class="card section">
+        <div class="section-head"><div><h2>드리프트 시뮬레이션</h2><p class="help">토마토 일별 수익률 기반 정상 또는 폭염 배치를 <code>/predict/batch-test</code>로 전송합니다.</p></div></div>
+        <div class="btn-row">
+          <button class="btn primary simulation-btn" onclick="sendBatch('normal')">정상 배치 전송</button>
+          <button class="btn danger simulation-btn" onclick="sendBatch('drift')">폭염 배치 전송</button>
+        </div>
+        <div class="status-line" id="drift-status"></div>
+        <div class="result" id="drift-result"></div>
+      </section>
+      <section class="card section">
+        <div class="section-head"><div><h2>재학습 로그 원문</h2><p class="help">드리프트 감지·재학습·승격 기록입니다.</p></div></div>
+        <button class="btn" onclick="loadRawLog()">새로고침</button>
+        <div class="result show" id="log-content">불러오는 중</div>
+      </section>
+    </div>
+  </section>
+
+  <section class="view" id="view-datasets">
+    <div class="panel-grid">
+      <section class="card section">
+        <div class="section-head"><div><h2>학습 데이터 현황</h2><p class="help">가장 최근 업로드된 CSV를 학습에 사용합니다.</p></div></div>
+        <div class="facts" id="dataset-facts"><div class="empty">불러오는 중</div></div>
+      </section>
+      <section class="card section">
+        <div class="section-head"><div><h2>토마토 데이터 업로드</h2><p class="help">UTF-8 CSV · Date, Close, Volume · 최소 40행</p></div></div>
+        <div class="btn-row">
+          <input type="file" id="upload-input" accept=".csv,text/csv" />
+          <button class="btn primary" onclick="uploadFile()">업로드</button>
+        </div>
+        <div class="status-line" id="upload-status"></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<footer>토마토 가격 예측 AIOps · 실제 서버 기록 기반 운영 대시보드</footer>
 
 <script>
-/* ===================== 전역 상태 ===================== */
-// 서버(data/features.py, monitoring/drift_detector.py)와 동일한 값 (상수만 복제)
 const SEQ_LEN = 25;
 const WINDOW_SIZE = 15;
 const RMSE_THRESHOLD = 612.0; // 원/kg (#45)
-
-let lastPipelineRun = null; // { driftCheck, clientRmse, ts }
-
 const NORMAL_SIGMA = 0.121260;
 const DRIFT_SIGMA = NORMAL_SIGMA * 3;
 const DEFAULT_BASE_PRICE = 3722.87;
-const PIPELINE_STAGES = [
-  { key: "collect", title: "데이터 수집", desc: "요청 수신" },
-  { key: "monitor", title: "데이터 모니터링", desc: "예측 기록 누적" },
-  { key: "detect", title: "드리프트 감지", desc: "RMSE vs 임계치" },
-  { key: "trigger", title: "재학습 트리거", desc: "조건 충족 시 시작" },
-  { key: "train", title: "모델 학습", desc: "fine-tuning" },
-  { key: "register", title: "모델 등록", desc: "MLflow Registry" },
-  { key: "deploy", title: "배포", desc: "Production 승격" },
-];
 
-/* ===================== 유틸 ===================== */
+const PIPELINE_STAGES = [
+  ["수집", "요청 수신"], ["모니터링", "예측 기록"], ["감지", "RMSE 판정"],
+  ["트리거", "재학습 시작"], ["학습", "fine-tuning"], ["등록", "MLflow"], ["배포", "Production"],
+];
+let lastPipelineRun = null;
+let latestLogState = { events: [], promotions: [], driftActive: null };
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+}
+function pill(text, level = "") {
+  return `<span class="pill ${level}">${escapeHtml(text)}</span>`;
+}
+function formatNumber(value, digits = 0) {
+  return value == null ? "—" : Number(value).toLocaleString("ko-KR", { maximumFractionDigits: digits });
+}
+function formatTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("ko-KR", { hour12: false });
+}
+function relativeTime(value) {
+  if (!value) return "기록 없음";
+  const seconds = Math.max(0, (Date.now() - new Date(value).getTime()) / 1000);
+  if (seconds < 60) return `${Math.floor(seconds)}초 전`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간 전`;
+  return `${Math.floor(seconds / 86400)}일 전`;
+}
+async function getJSON(path) {
+  const response = await fetch(path);
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.detail || `HTTP ${response.status}`);
+  return data;
+}
+async function safeJson(response) {
+  const text = await response.text();
+  try { return JSON.parse(text); } catch (_) { return { __raw: text || "(응답 없음)" }; }
+}
+function setStatus(id, text, level = "") {
+  document.getElementById(id).innerHTML = pill(text, level);
+}
+function showResult(id, value, isError = false) {
+  const element = document.getElementById(id);
+  element.className = `result show${isError ? " error" : ""}`;
+  element.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+function setMetric(id, value, meta, state = "") {
+  const card = document.getElementById(id);
+  card.dataset.state = state;
+  card.querySelector(".metric-value").textContent = value;
+  card.querySelector(".metric-meta").textContent = meta;
+}
+
+function parseAiopsLog(content) {
+  const events = String(content || "").split(/\r?\n/).filter(Boolean).map((line, index) => {
+    const timestamp = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d+)?)/)?.[1]?.replace(" ", "T").replace(",", ".");
+    const level = line.includes("[WARN]") || line.includes("[WARNING]") ? "warn"
+      : line.includes("[OK]") ? "ok" : line.includes("[ERROR]") ? "err" : "info";
+    return { index, timestamp, level, line };
+  });
+  const promotions = events.flatMap((event) => {
+    const match = event.line.match(/new_rmse=([0-9.]+).*promoted:\s+(\S+)\s+v(\d+)/);
+    return match ? [{ ...event, rmse: Number(match[1]), model: match[2], version: match[3] }] : [];
+  });
+  const lastDrift = events.findLastIndex((event) => event.line.includes("drift detected"));
+  const lastPromotion = events.findLastIndex((event) => event.line.includes("production promoted"));
+  return { events, promotions, driftActive: lastDrift >= 0 && lastDrift > lastPromotion };
+}
+
+function renderMetrics(metrics) {
+  setMetric("metric-requests", formatNumber(metrics.count), `${metrics.window_min}분 · ${metrics.target}`);
+  if (metrics.avg_latency_ms == null) {
+    setMetric("metric-latency", "데이터 없음", "해당 구간에 예측 요청이 없습니다");
+    setMetric("metric-success", "데이터 없음", "해당 구간에 예측 요청이 없습니다");
+  } else {
+    const latencyWarn = metrics.alerts?.includes("p95_latency_ms");
+    setMetric("metric-latency", `${formatNumber(metrics.avg_latency_ms, 1)} ms`,
+      `P95 ${formatNumber(metrics.p95_latency_ms, 1)} ms · 기준 ${metrics.limits.p95_latency_ms} ms`, latencyWarn ? "warn" : "");
+    const success = (1 - metrics.error_rate) * 100;
+    const errorWarn = metrics.alerts?.includes("error_rate");
+    setMetric("metric-success", `${formatNumber(success, 1)}%`,
+      `5xx ${formatNumber(metrics.error_rate * 100, 1)}% · 4xx ${formatNumber(metrics.client_error_rate * 100, 1)}%`, errorWarn ? "warn" : "");
+  }
+}
+
+function renderLogs(state, report) {
+  latestLogState = state;
+  const latest = state.promotions.at(-1);
+  if (latest) {
+    setMetric("metric-rmse", formatNumber(latest.rmse, 2), `게이트 ${formatNumber(RMSE_THRESHOLD, 2)} · v${latest.version}`, latest.rmse <= RMSE_THRESHOLD ? "ok" : "warn");
+    document.getElementById("current-model").textContent = latest.model;
+    document.getElementById("current-version").textContent = `v${latest.version}`;
+  } else {
+    setMetric("metric-rmse", "데이터 없음", "아직 Production 승격 로그가 없습니다");
+    document.getElementById("current-model").textContent = report?.model_version ? "보고서 기록 모델" : "기록 없음";
+    document.getElementById("current-version").textContent = report?.model_version || "—";
+  }
+  document.getElementById("rmse-gate").textContent = `≤ ${formatNumber(RMSE_THRESHOLD, 2)}`;
+
+  const drift = lastPipelineRun
+    ? lastPipelineRun.driftCheck.status === "retrain_triggered"
+    : state.events.length ? state.driftActive : report?.drift_detected;
+  if (drift === true) setMetric("metric-drift", "감지됨", "재학습 또는 승격 결과를 확인하세요", "warn");
+  else if (drift === false) setMetric("metric-drift", "정상", "활성 드리프트 없음", "ok");
+  else setMetric("metric-drift", "데이터 없음", "로그와 보고서에 판정 기록이 없습니다");
+
+  const history = document.getElementById("model-history");
+  history.innerHTML = state.promotions.length
+    ? state.promotions.slice(-10).reverse().map((item) => `<tr><td>${escapeHtml(formatTime(item.timestamp))}</td><td>${escapeHtml(item.model)}</td><td>v${escapeHtml(item.version)}</td><td>${formatNumber(item.rmse, 2)}</td><td>${pill("Production", "ok")}</td></tr>`).join("")
+    : '<tr><td colspan="5" class="empty">아직 Production 승격 이력이 없습니다.</td></tr>';
+
+  const alertEvents = state.events.filter((event) =>
+    event.line.includes("drift detected") || event.line.includes("retrain triggered") || event.line.includes("production promoted")
+  ).slice(-8).reverse();
+  document.getElementById("alert-list").innerHTML = alertEvents.length
+    ? alertEvents.map((event) => `<div class="alert">${pill(event.level.toUpperCase(), event.level)}<div class="alert-body">${escapeHtml(event.line.replace(/^.*?\[(?:WARNING|INFO|ERROR)\]\s*/, ""))}<div class="alert-time">${escapeHtml(formatTime(event.timestamp))}</div></div></div>`).join("")
+    : '<div class="empty">아직 드리프트 관련 알림이 없습니다.</div>';
+  renderPipeline();
+}
+
+function renderPipeline() {
+  let states = ["idle", "idle", "idle", "idle", "idle", "idle", "idle"];
+  let label = "실행 기록 없음";
+  if (lastPipelineRun) {
+    const check = lastPipelineRun.driftCheck;
+    label = relativeTime(lastPipelineRun.timestamp);
+    if (check.status === "retrain_triggered" && check.promoted === true) states = ["ok", "ok", "warn", "ok", "ok", "ok", "ok"];
+    else if (check.status === "retrain_triggered" && check.promoted === false) states = ["ok", "ok", "warn", "ok", "ok", "warn", "idle"];
+    else if (check.status === "retrain_triggered") states = ["ok", "ok", "warn", "ok", "idle", "idle", "idle"];
+    else states = ["ok", "ok", "ok", "idle", "idle", "idle", "idle"];
+  } else if (latestLogState.events.length) {
+    const last = latestLogState.events.filter((event) =>
+      event.line.includes("drift detected") || event.line.includes("retrain triggered") || event.line.includes("production promoted")
+    ).at(-1);
+    if (!last) return;
+    label = relativeTime(last.timestamp);
+    if (last.line.includes("production promoted")) states = ["ok", "ok", "warn", "ok", "ok", "ok", "ok"];
+    else if (latestLogState.driftActive) states = ["ok", "ok", "warn", "ok", "idle", "idle", "idle"];
+  }
+  document.getElementById("pipeline-run-badge").textContent = label;
+  document.getElementById("pipeline-track").innerHTML = PIPELINE_STAGES.map((stage, index) => {
+    const state = states[index];
+    const status = state === "ok" ? "완료" : state === "warn" ? "확인 필요" : "대기";
+    return `<div class="stage ${state}"><div class="stage-icon">${index + 1}</div><div class="stage-title">${stage[0]}</div><div class="stage-desc">${stage[1]}</div><div class="stage-status">${status}</div></div>`;
+  }).join("");
+}
+
+async function renderHealth() {
+  try {
+    const health = await getJSON("/health");
+    const healthy = health.status === "ok";
+    const badge = document.getElementById("health-badge");
+    badge.className = `pill ${healthy ? "ok" : "warn"}`;
+    badge.textContent = healthy ? "Healthy" : health.status;
+    document.getElementById("loading-mode").textContent = `${health.loading_mode || "—"} · ${health.model_loaded ? "로드됨" : "미로드"}`;
+  } catch (error) {
+    const badge = document.getElementById("health-badge");
+    badge.className = "pill err";
+    badge.textContent = "조회 실패";
+    document.getElementById("loading-mode").textContent = error.message;
+  }
+}
+
+async function renderDataStatus() {
+  const facts = document.getElementById("dataset-facts");
+  try {
+    const data = await getJSON("/data/status");
+    if (!data.exists) {
+      facts.innerHTML = '<div class="empty">업로드된 학습 데이터가 없습니다.</div>';
+      return;
+    }
+    const rows = [
+      ["파일", data.filename], ["행 수", `${formatNumber(data.rows)}행`],
+      ["기간", `${data.start_date} ~ ${data.end_date}`],
+      ["최저 종가", `${formatNumber(data.min_close, 2)}원/kg`], ["최고 종가", `${formatNumber(data.max_close, 2)}원/kg`],
+    ];
+    facts.innerHTML = rows.map(([key, value]) => `<div class="fact"><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+  } catch (error) {
+    facts.innerHTML = `<div class="empty">데이터 현황 조회 실패: ${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function refreshDashboard(minutes = document.querySelector(".filter.active")?.dataset.minutes || 5) {
+  const [metrics, log, report] = await Promise.all([
+    getJSON(`/metrics?minutes=${minutes}`).catch((error) => ({ error })),
+    getJSON("/logs/aiops.log").catch((error) => ({ error })),
+    getJSON("/report").catch(() => null),
+    renderHealth(),
+    renderDataStatus(),
+  ]);
+  if (metrics.error) {
+    ["metric-requests", "metric-latency", "metric-success"].forEach((id) => setMetric(id, "조회 실패", metrics.error.message, "error"));
+  } else renderMetrics(metrics);
+  renderLogs(log.error ? { events: [], promotions: [], driftActive: null } : parseAiopsLog(log.content), report);
+}
+
 function randn() {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
-  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
-function randomWalk(n, base, sigma) {
-  const prices = [];
+function randomWalk(length, base, sigma) {
   let logPrice = Math.log(base);
-  for (let i = 0; i < n; i++) { logPrice += randn() * sigma; prices.push(Math.exp(logPrice)); }
-  return prices;
+  return Array.from({ length }, () => {
+    logPrice += randn() * sigma;
+    return Math.exp(logPrice);
+  });
 }
 function rmseOf(actual, predicted) {
-  const n = Math.min(actual.length, predicted.length);
-  if (n === 0) return null;
-  let sum = 0;
-  for (let i = 0; i < n; i++) sum += (actual[i] - predicted[i]) ** 2;
-  return Math.sqrt(sum / n);
-}
-function relTime(ts) {
-  if (!ts) return "-";
-  const diff = Math.max(0, Date.now() / 1000 - ts);
-  if (diff < 60) return `${Math.floor(diff)}초 전`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  return `${Math.floor(diff / 86400)}일 전`;
-}
-async function getJSON(path) {
-  const res = await fetch(path);
-  const data = await res.json().catch(() => null);
-  return { ok: res.ok, status: res.status, data };
-}
-// 서버가 500 등을 일반 텍스트("Internal Server Error")로 응답할 수도 있어
-// (예: model_loader.py의 _load_from_mlflow TODO가 아직 NotImplementedError를 던지는 경우),
-// res.json()을 바로 쓰지 않고 텍스트로 먼저 받아 파싱을 시도한다.
-async function safeJson(res) {
-  const text = await res.text();
-  try { return JSON.parse(text); } catch (e) { return { __raw: text || "(응답 없음)" }; }
-}
-function showResult(el, obj, isError = false) {
-  el.classList.add("show");
-  el.style.borderColor = isError ? "var(--err)" : "var(--border)";
-  el.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+  const length = Math.min(actual.length, predicted.length);
+  if (!length) return null;
+  return Math.sqrt(actual.slice(0, length).reduce((sum, value, index) => sum + (value - predicted[index]) ** 2, 0) / length);
 }
 
-/* ===================== 데이터 업로드 ===================== */
+async function sendBatch(kind) {
+  const buttons = document.querySelectorAll(".simulation-btn");
+  buttons.forEach((button) => { button.disabled = true; });
+  setStatus("drift-status", "전송 중 · 재학습 시 수십 초 걸릴 수 있습니다", "warn");
+  const prices = randomWalk(SEQ_LEN + WINDOW_SIZE, DEFAULT_BASE_PRICE, kind === "drift" ? DRIFT_SIGMA : NORMAL_SIGMA);
+  try {
+    const response = await fetch("/predict/batch-test", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prices }),
+    });
+    const data = await safeJson(response);
+    if (!response.ok) throw Object.assign(new Error(data.detail || data.__raw || `HTTP ${response.status}`), { data });
+    const actual = prices.slice(SEQ_LEN);
+    const clientRmse = rmseOf(actual, data.predictions || []);
+    lastPipelineRun = { driftCheck: data.drift_check || {}, timestamp: new Date().toISOString() };
+    const check = lastPipelineRun.driftCheck;
+    const message = check.promoted ? "재학습 완료 · Production 승격" : check.status === "retrain_triggered" ? "드리프트 감지 · 재학습 완료, 게이트 미통과" : "정상 · 드리프트 없음";
+    setStatus("drift-status", `${message} · 클라이언트 RMSE ${formatNumber(clientRmse, 2)}원/kg`, check.promoted ? "ok" : check.status === "retrain_triggered" ? "warn" : "ok");
+    showResult("drift-result", data);
+    await refreshDashboard();
+  } catch (error) {
+    setStatus("drift-status", `요청 실패: ${error.message}`, "err");
+    showResult("drift-result", error.data || error.message, true);
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
 async function uploadFile() {
   const input = document.getElementById("upload-input");
-  const statusEl = document.getElementById("upload-status");
   if (!input.files.length) {
-    statusEl.innerHTML = `<span class="pill warn"><span class="dot"></span>파일을 먼저 선택하세요</span>`;
+    setStatus("upload-status", "CSV 파일을 먼저 선택하세요", "warn");
     return;
   }
   const form = new FormData();
   form.append("file", input.files[0]);
-  statusEl.innerHTML = `<span class="pill neutral"><span class="dot"></span>업로드 중…</span>`;
+  setStatus("upload-status", "업로드 중");
   try {
-    const res = await fetch("/data/upload", { method: "POST", body: form });
-    const data = await safeJson(res);
-    if (!res.ok) {
-      statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${data.detail || "업로드 실패"}</span>`;
-      return;
-    }
-    statusEl.innerHTML = `<span class="pill ok"><span class="dot"></span>업로드 완료: ${data.filename} (${data.rows}행)</span>`;
-  } catch (e) {
-    statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>요청 실패: ${e.message}</span>`;
+    const response = await fetch("/data/upload", { method: "POST", body: form });
+    const data = await safeJson(response);
+    if (!response.ok) throw new Error(data.detail || data.__raw || `HTTP ${response.status}`);
+    setStatus("upload-status", `${data.filename} · ${data.rows}행 업로드 완료`, "ok");
+    await renderDataStatus();
+  } catch (error) {
+    setStatus("upload-status", `업로드 실패: ${error.message}`, "err");
   }
 }
 
-/* ===================== 재학습 로그 ===================== */
-async function loadLogFiles() {
-  const { ok, data } = await getJSON("/logs");
-  const wrap = document.getElementById("log-file-list");
-  if (!ok || !data || !data.length) {
-    wrap.innerHTML = `<span class="pill neutral">아직 로그가 없습니다 - 드리프트 배치를 보내면 logs/aiops.log가 생깁니다</span>`;
-    return;
-  }
-  wrap.innerHTML = data.map((f) =>
-    `<button class="btn secondary" onclick="openLogFile('${f.name}')">${f.name} (${f.size}B)</button>`
-  ).join("");
-}
-async function openLogFile(name) {
-  const box = document.getElementById("log-content");
-  const { ok, data } = await getJSON(`/logs/${encodeURIComponent(name)}`);
-  if (!ok || !data) { showResult(box, "불러오기 실패", true); return; }
-  showResult(box, data.content || "(비어 있음)");
-}
-
-/* ===================== 파이프라인 시각화 ===================== */
-function renderPipeline() {
-  const track = document.getElementById("pipeline-track");
-  const badge = document.getElementById("pipeline-run-badge");
-
-  if (!lastPipelineRun) {
-    badge.className = "pill neutral"; badge.textContent = "아직 실행 안 함";
-    track.innerHTML = PIPELINE_STAGES.map((s, i) => stageHtml(s, i, "idle", "대기 중")).join("");
-    return;
-  }
-
-  const { driftCheck, ts } = lastPipelineRun;
-  badge.className = "pill neutral";
-  badge.textContent = `마지막 실행 ${relTime(ts)}`;
-
-  const serverStatus = driftCheck.status; // "ok" | "retrain_triggered"
-  const promoted = driftCheck.promoted;
-
-  let states; // 7개 단계 상태: idle | ok | warn
-  if (serverStatus === "retrain_triggered" && promoted === true) {
-    states = ["ok", "ok", "warn", "ok", "ok", "ok", "ok"];
-  } else if (serverStatus === "retrain_triggered" && promoted === false) {
-    states = ["ok", "ok", "warn", "ok", "ok", "warn", "idle"];
-  } else if (serverStatus === "retrain_triggered") {
-    states = ["ok", "ok", "warn", "idle", "idle", "idle", "idle"];
-  } else {
-    states = ["ok", "ok", "ok", "idle", "idle", "idle", "idle"];
-  }
-  const statusText = { ok: "완료", warn: "감지됨", idle: "대기 중" };
-
-  track.innerHTML = PIPELINE_STAGES.map((s, i) => stageHtml(s, i, states[i], statusText[states[i]])).join("");
-}
-function stageHtml(stage, idx, state, statusLabel) {
-  return `
-    <div class="pipe-stage ${state}">
-      <div class="pipe-title">${stage.title}</div>
-      <div class="pipe-desc">${stage.desc}</div>
-      <div class="pipe-status">${statusLabel}</div>
-    </div>`;
-}
-
-/* ===================== 드리프트 배치 전송 ===================== */
-async function sendBatch(kind) {
-  const statusEl = document.getElementById("drift-status");
-  const resultBox = document.getElementById("drift-result");
-  const n = SEQ_LEN + WINDOW_SIZE;
-  const sigma = kind === "drift" ? DRIFT_SIGMA : NORMAL_SIGMA;
-  const prices = randomWalk(n, DEFAULT_BASE_PRICE, sigma);
-
-  statusEl.innerHTML = `<span class="pill warn"><span class="dot"></span>전송 중… (fine-tuning이 걸리면 수십 초 걸릴 수 있습니다)</span>`;
-
+async function loadRawLog() {
   try {
-    const res = await fetch("/predict/batch-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prices }) });
-    const data = await safeJson(res);
-    if (!res.ok) {
-      const reason = data.__raw
-        ? "서버 오류 - model_loader.py 또는 predict.py의 TODO가 아직 구현되지 않았을 수 있습니다"
-        : "오류 (TODO 미구현일 수 있음)";
-      statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${reason}</span>`;
-      showResult(resultBox, { status: res.status, detail: data }, true);
-      return;
-    }
-    const actual = [];
-    for (let i = 0; i < prices.length - SEQ_LEN; i++) actual.push(prices[i + SEQ_LEN]);
-    const clientRmse = rmseOf(actual, data.predictions || []);
-
-    lastPipelineRun = { driftCheck: data.drift_check || {}, clientRmse, ts: Date.now() / 1000 };
-    renderPipeline();
-    loadLogFiles();
-
-    const check = data.drift_check || {};
-    let level = "ok", label = "정상 (드리프트 없음)";
-    if (check.status === "retrain_triggered" && check.promoted) {
-      level = "ok"; label = `재학습 완료 · 새 버전 승격 (rmse=${check.rmse?.toFixed?.(2) ?? check.rmse})`;
-    } else if (check.status === "retrain_triggered" && check.promoted === false) {
-      level = "warn"; label = `드리프트 감지 · 재학습했지만 게이트 미통과 (rmse=${check.rmse?.toFixed?.(2) ?? check.rmse})`;
-    } else if (check.status === "retrain_triggered") {
-      level = "warn"; label = "드리프트 감지 · 재학습 트리거됨";
-    }
-    statusEl.innerHTML = `
-      <span class="pill ${level}"><span class="dot"></span>${label}</span>
-      <span class="pill neutral" style="margin-left:6px;">클라이언트 계산 RMSE: ${clientRmse != null ? clientRmse.toFixed(2) : "-"}원/kg</span>`;
-    showResult(resultBox, data, false);
-  } catch (e) {
-    statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>연결 실패</span>`;
-    showResult(resultBox, "요청 실패: " + e.message, true);
+    const data = await getJSON("/logs/aiops.log");
+    showResult("log-content", data.content || "로그가 비어 있습니다.");
+  } catch (error) {
+    showResult("log-content", `로그 조회 실패: ${error.message}`, true);
   }
 }
 
-/* ===================== 초기화 ===================== */
-async function init() {
-  renderPipeline();
-  loadLogFiles();
+document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
+  document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${tab.dataset.view}`));
+  if (tab.dataset.view === "simulation") loadRawLog();
+}));
+document.querySelectorAll(".filter").forEach((filter) => filter.addEventListener("click", () => {
+  document.querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === filter));
+  refreshDashboard(filter.dataset.minutes);
+}));
+function updateClock() {
+  document.getElementById("clock").textContent = new Date().toLocaleString("ko-KR", { hour12: false });
 }
-init();
+updateClock();
+setInterval(updateClock, 1000);
+renderPipeline();
+refreshDashboard();
+setInterval(refreshDashboard, 30000);
 </script>
 </body>
 </html>

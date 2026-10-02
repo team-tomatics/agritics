@@ -1,15 +1,15 @@
 """
-Day2: MLflow로 HAIC LSTM 모델을 학습 -> 기록(Tracking) -> 게이트 검증 -> 등록(Registry) -> Production 승격.
+Day2: MLflow로 토마토 시세 LSTM 모델을 학습 -> 기록(Tracking) -> 게이트 검증 -> 등록(Registry) -> Production 승격.
 Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 fine-tuning 재학습.
 
 실습 시나리오 (94번 슬라이드를 LSTM 버전으로 재구성):
-    1) HAIC 데이터로 base 모델 학습(50 epoch) -> RMSE 확인 (게이트 미달 가능)
+    1) 토마토 가격 · 반입량 데이터로 base 모델 학습 -> RMSE 확인 (게이트 미달 가능)
     2) 게이트(612원/kg) 통과 시 Production으로 승격
     3) (Day3) 드리프트 감지 시 Production 가중치에서 warm-start -> 최근 1개월 데이터로
        10 epoch만 fine-tuning (처음부터 다시 학습하지 않음 - 21거래일로는 스크래치 학습이 불안정)
 
 실행:
-    (대시보드에서 HAIC CSV를 먼저 업로드하세요 - data/sample_haic_prices.csv가 예시입니다)
+    (대시보드에서 시세 CSV를 먼저 업로드하세요 - data/tomato_prices.csv)
     python scripts/train_baseline_v1.py     # 최초 1회 (scaler.pkl 생성)
     python serving_app/train_and_register.py
 """
@@ -25,12 +25,13 @@ from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 from tensorflow import keras
 
-from data.features import load_rows, build_sequences, train_test_split, HAICScaler
+from data.features import load_rows, build_sequences, train_test_split, PriceVolumeScaler
 from data.storage import latest_upload
 from serving_app.lstm_model import build_model
 
 # 시드 고정: LSTM 가중치 초기화가 랜덤이라 시드 없이는 실행마다 RMSE가 크게 흔들려
-# (관찰치: 2.22~5.29) 게이트($4.00) 통과 여부가 운에 좌우됩니다. numpy/tensorflow/python
+# (토마토 실측: 시드 42 · 1 · 7 · 123 · 2026 → 540.0 · 487.6 · 510.4 · 488.7 · 499.6원/kg, 기획서 3-6)
+# 게이트(612원/kg)는 모두 통과하지만 단순 예측(529.9)보다 나은지는 시드에 좌우됩니다. numpy/tensorflow/python
 # random을 한 번에 고정해 재현 가능한 학습 결과를 보장합니다.
 SEED = 42
 keras.utils.set_random_seed(SEED)
@@ -47,7 +48,7 @@ def rmse(y_true, y_pred) -> float:
     return float(np.sqrt(np.mean((np.array(y_true) - np.array(y_pred)) ** 2)))
 
 
-def _prepare(rows: list[dict], scaler: HAICScaler):
+def _prepare(rows: list[dict], scaler: PriceVolumeScaler):
     X, y = build_sequences(rows, scaler)
     X_train, y_train, X_test, y_test = train_test_split(X, y)
     X_train = np.array(X_train, dtype="float32")
@@ -56,12 +57,12 @@ def _prepare(rows: list[dict], scaler: HAICScaler):
     return X_train, y_train_scaled, X_test, y_test
 
 
-def _score(model, X_test, y_test, scaler: HAICScaler) -> float:
+def _score(model, X_test, y_test, scaler: PriceVolumeScaler) -> float:
     preds = [scaler.inverse_close(p) for p in model.predict(X_test, verbose=0).flatten()]
     return rmse(y_test, preds)
 
 
-def _production_score(X_test, y_test, scaler: HAICScaler) -> float | None:
+def _production_score(X_test, y_test, scaler: PriceVolumeScaler) -> float | None:
     """회귀 테스트 기준: 현재 Production 을 새 모델과 같은 test 셋으로 채점. 첫 등록이면 None."""
     try:
         prod = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
@@ -96,7 +97,7 @@ def train_and_register(csv_path: str | None = None, rows: list[dict] | None = No
     """
     if rows is None:
         rows = load_rows(csv_path or latest_upload())
-    scaler = HAICScaler.load(SCALER_PATH)
+    scaler = PriceVolumeScaler.load(SCALER_PATH)
     X_train, y_train_scaled, X_test, y_test = _prepare(rows, scaler)
 
     with mlflow.start_run(run_name="base-train"):
@@ -122,7 +123,7 @@ def fine_tune(rows: list[dict]) -> dict:
     Day3: 현재 Production 모델 가중치에서 이어서(warm start), 넘겨받은 rows(최근 데이터)로
     짧게 fine-tuning합니다. rows가 적을 때(예: 최근 1개월)도 스크래치 학습보다 훨씬 안정적입니다.
     """
-    scaler = HAICScaler.load(SCALER_PATH)
+    scaler = PriceVolumeScaler.load(SCALER_PATH)
     X_train, y_train_scaled, X_test, y_test = _prepare(rows, scaler)
 
     model = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")

@@ -24,7 +24,7 @@ body:
     attributes:
       label: 품목 · 데이터
       description: 어떤 품목 · CSV 로 돌렸나요?
-      placeholder: "예: 토마토 data/tomato_prices.csv / HAIC 샘플"
+      placeholder: "예: 토마토 data/tomato_prices.csv"
 
   - type: textarea
     id: symptom

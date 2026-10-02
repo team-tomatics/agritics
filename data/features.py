@@ -1,5 +1,5 @@
 """
-HAIC 데이터를 LSTM 입력용 시퀀스로 변환하는 공용 유틸리티.
+가격 · 반입량 시세 데이터(토마토 등)를 LSTM 입력용 시퀀스로 변환하는 공용 유틸리티.
 
 Day1 baseline 학습(scripts/train_baseline_v1.py), Day2 MLflow 학습
 (serving_app/train_and_register.py), Day3 fine-tuning 재학습
@@ -17,11 +17,11 @@ from data.validation import load_price_volume_csv
 SEQ_LEN = 25  # LSTM 입력 윈도우 길이 (거래일 수) - 가락시장 한 달 (월~토 거래, 실측 25.3일). 기획서 3-6
 
 
-def load_rows(csv_path: str = "data/haic_prices.csv") -> list[dict]:
+def load_rows(csv_path: str = "data/tomato_prices.csv") -> list[dict]:
     return load_price_volume_csv(csv_path)
 
 
-class HAICScaler:
+class PriceVolumeScaler:
     """
     close/volume을 각각 [0, 1] 범위로 정규화하는 min-max 스케일러.
 
@@ -36,7 +36,7 @@ class HAICScaler:
         self.close_min = self.close_max = None
         self.volume_min = self.volume_max = None
 
-    def fit(self, rows: list[dict]) -> "HAICScaler":
+    def fit(self, rows: list[dict]) -> "PriceVolumeScaler":
         closes = [r["Close"] for r in rows]
         volumes = [r["Volume"] for r in rows]
         self.close_min, self.close_max = min(closes), max(closes)
@@ -63,7 +63,7 @@ class HAICScaler:
         return self._scale(close, self.close_min, self.close_max)
 
     def inverse_close(self, scaled_close: float) -> float:
-        """모델이 뱉은 정규화된 예측값을 실제 달러 단위 종가로 되돌린다."""
+        """모델이 뱉은 정규화된 예측값을 실제 원/kg 도매가격으로 되돌린다."""
         return self._unscale(scaled_close, self.close_min, self.close_max)
 
     def save(self, path: str = "serving_app/models/scaler.pkl"):
@@ -71,14 +71,14 @@ class HAICScaler:
             pickle.dump(self.__dict__, f)
 
     @classmethod
-    def load(cls, path: str = "serving_app/models/scaler.pkl") -> "HAICScaler":
+    def load(cls, path: str = "serving_app/models/scaler.pkl") -> "PriceVolumeScaler":
         scaler = cls()
         with open(path, "rb") as f:
             scaler.__dict__.update(pickle.load(f))
         return scaler
 
 
-def build_sequences(rows: list[dict], scaler: HAICScaler, seq_len: int = SEQ_LEN):
+def build_sequences(rows: list[dict], scaler: PriceVolumeScaler, seq_len: int = SEQ_LEN):
     """
     rows(시간순 OHLCV)에서 (SEQ_LEN, 2) 크기의 정규화된 입력 시퀀스와
     다음날 종가(정규화 전 실값) 타깃을 만든다.

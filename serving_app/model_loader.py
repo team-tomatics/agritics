@@ -9,7 +9,7 @@
 
 ■ 핵심 개념
    1) 학습 때와 똑같이 전처리해야 한다
-        모델은 0~1 값으로 학습했습니다. 서빙할 때도 입력을 0~1로 바꾸고, 출력은 달러로 되돌려야 합니다.
+        모델은 0~1 값으로 학습했습니다. 서빙할 때도 입력을 0~1로 바꾸고, 출력은 원/kg 로 되돌려야 합니다.
    2) Lazy vs Eager
         Eager : 서버가 켜질 때 모델을 바로 불러옴 → 서버 시작은 느리지만 첫 요청이 빠름
         Lazy  : 첫 /predict 요청이 올 때 불러옴  → 서버 시작은 빠르지만 첫 요청이 느림
@@ -25,17 +25,17 @@
    [빈칸 4]           Day1 : get_model()   — Lazy Loading
    [빈칸 5]           Day2 : _load_from_mlflow() — MLflow 에서 불러오기
 
-■ self.scaler(HAICScaler)가 가진 도구 — [빈칸 2]·[빈칸 3]은 이 중에서 고르는 문제입니다
-   transform_point(종가, 거래량) → [0~1, 0~1]   하루치 입력 2개를 0~1로
-   scale_close(종가)             → 0~1          종가 하나를 0~1로 (학습 정답용)
-   inverse_close(0~1 값)         → 종가(달러)    0~1 값을 달러로 되돌리기
+■ self.scaler(PriceVolumeScaler)가 가진 도구 — [빈칸 2]·[빈칸 3]은 이 중에서 고르는 문제입니다
+   transform_point(가격, 반입량) → [0~1, 0~1]   하루치 입력 2개를 0~1로
+   scale_close(가격)             → 0~1          가격 하나를 0~1로 (학습 정답용)
+   inverse_close(0~1 값)         → 가격(원/kg)   0~1 값을 원/kg 로 되돌리기
 """
 import os
 import time
 
-from data.features import HAICScaler
+from data.features import PriceVolumeScaler
 
-LOCAL_MODEL_PATH = "serving_app/models/haic_v1.keras"
+LOCAL_MODEL_PATH = "serving_app/models/tomato_v1.keras"  # scripts/train_baseline_v1.py MODEL_PATH 와 같게 (#56)
 SCALER_PATH = "serving_app/models/scaler.pkl"
 MLFLOW_MODEL_URI = "models:/Tomato_Price_Predictor/Production"  # "models:/<모델 이름>/<단계>" 형식
 
@@ -48,38 +48,38 @@ class LoadedModel:
     local 모델이든 MLflow 모델이든 이 상자에 담으면 똑같은 방법(predict_one)으로 쓸 수 있습니다.
     """ 
 
-    def __init__(self, keras_model, scaler: HAICScaler, version: str):
+    def __init__(self, keras_model, scaler: PriceVolumeScaler, version: str):
         self._keras_model = keras_model
         self.scaler = scaler
         self.version = version
 
     def predict_one(self, sequence: list[dict]) -> float:
         """
-        20일치 데이터로 다음날 종가 1개를 예측합니다.
-        받는 것  : sequence = [{"close": 160.0, "volume": 1200000}, ... 20개]  (오래된 날 → 최근 날)
-        돌려줄 것: 다음날 예상 종가 (달러 단위, 예: 161.37)
+        25거래일 데이터로 다음 거래일 도매가격 1개를 예측합니다.
+        받는 것  : sequence = [{"close": 4599.0, "volume": 158977}, ... 25개]  (오래된 날 → 최근 날, 원/kg · kg)
+        돌려줄 것: 다음 거래일 예상 도매가격 (원/kg, 예: 3926.0)
 
-        흐름:  [달러 값 20개] → ① 0~1로 변환 → ② 입력 모양 맞추기 → ③ 예측(0~1) → ④ 달러로 복원
-        확인:  /predict 응답의 predicted_close 가 입력 종가와 비슷한 "달러" 값이면 성공
+        흐름:  [원/kg 값 25개] → ① 0~1로 변환 → ② 입력 모양 맞추기 → ③ 예측(0~1) → ④ 원/kg 로 복원
+        확인:  /predict 응답의 predicted_close 가 입력 가격과 비슷한 "원/kg" 값이면 성공
         """
         import numpy as np
 
         # ════════════════════════ [빈칸 2]  ① 0~1로 변환 ════════════════════════
-        # 하루치(p)의 종가·거래량을 0~1로 바꾸는 스케일러 도구 이름을 채우세요. (파일 위 "도구" 목록에서 고르기)
-        #   예) [{"close": 160.0, "volume": 1200000}, ...]  →  [[0.42, 0.31], ...]
+        # 하루치(p)의 가격·반입량을 0~1로 바꾸는 스케일러 도구 이름을 채우세요. (파일 위 "도구" 목록에서 고르기)
+        #   예) [{"close": 4599.0, "volume": 158977}, ...]  →  [[0.25, 0.36], ...]   (토마토 스케일러 기준)
         #
         #   생각해 볼 질문
         #     · 이 모델은 학습할 때 어떤 도구로 입력을 0~1로 바꿨을까요? (data/features.py 의 build_sequences 참고)
         #     · 서버에서 다른 방법으로 바꾸거나, 아예 안 바꾸고 넣으면 어떻게 될까요?
         scaled = [self.scaler.transform_point(p["close"], p["volume"]) for p in sequence]
 
-        # ② 입력 모양 맞추기 — 모델은 "문제 여러 개"를 받으므로 1개라도 [ ]로 감쌉니다. (1, 20, 2)
+        # ② 입력 모양 맞추기 — 모델은 "문제 여러 개"를 받으므로 1개라도 [ ]로 감쌉니다. (1, 25, 2)
         x = np.array([scaled], dtype="float32")  # (1, SEQ_LEN, 2)
 
         # ③ 예측 — 결과가 [[0.47]] 처럼 2겹이라 [0][0] 으로 숫자만 꺼냅니다. (아직 0~1 범위)
         pred_scaled = float(self._keras_model.predict(x, verbose=0)[0][0])
 
-        # ════════════════════════ [빈칸 3]  ④ 달러로 복원 ════════════════════════
+        # ════════════════════════ [빈칸 3]  ④ 원/kg 로 복원 ════════════════════════
         # 사용자에게 돌려줄 값을 만드는 스케일러 도구 이름을 채우세요. (파일 위 "도구" 목록에서 고르기)
         #
         #   생각해 볼 질문
@@ -95,7 +95,7 @@ def _load_from_local() -> LoadedModel:
     from tensorflow import keras
 
     keras_model = keras.models.load_model(LOCAL_MODEL_PATH)
-    scaler = HAICScaler.load(SCALER_PATH)
+    scaler = PriceVolumeScaler.load(SCALER_PATH)
     return LoadedModel(keras_model=keras_model, scaler=scaler, version="v1-local")
 
 
@@ -107,7 +107,7 @@ def _load_from_mlflow() -> LoadedModel:
     확인 방법
       1) python serving_app/train_and_register.py   → "[GATE PASSED] ... promoted to Production"
       2) MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8077
-      3) /predict 응답의 model_version 이 "production-vN" 이고 predicted_close 가 달러 값이면 성공
+      3) /predict 응답의 model_version 이 "production-vN" 이고 predicted_close 가 원/kg 값이면 성공
     """
     import mlflow.tensorflow
 
@@ -122,7 +122,7 @@ def _load_from_mlflow() -> LoadedModel:
     #     · 모델은 MLflow 에서 가져왔습니다. 스케일러도 MLflow 에서 가져와야 할까요, 로컬 scaler.pkl 을 써야 할까요?
     #     · Day2 모델은 어떤 스케일러로 0~1 변환한 데이터로 학습했나요? (train_and_register.py 의 SCALER_PATH 참고)
     #     · 스케일러를 여기서 새로 fit 하면 어떤 일이 생길까요?
-    scaler = HAICScaler.load(SCALER_PATH)
+    scaler = PriceVolumeScaler.load(SCALER_PATH)
     # 팀: 응답 · 이력 로그 · 보고서에서 재학습 후 버전 전환이 보이도록 실제 번호를 붙인다 (예: "production-v3")
     return LoadedModel(keras_model=keras_model, scaler=scaler, version=_production_version_label())
 

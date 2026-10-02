@@ -17,9 +17,9 @@ cd agritics
 python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 
-# 지금은 HAIC 샘플로 파이프라인이 끝까지 도는지 확인 (토마토 CSV 는 A 가 머지한 뒤)
-.venv/bin/uvicorn serving_app.main:app --port 8077          # 터미널 1 → localhost:8077 에서 data/sample_haic_prices.csv 업로드
-.venv/bin/python scripts/train_baseline_v1.py                # 터미널 2 → scaler.pkl + haic_v1.keras
+# 토마토 데이터(data/tomato_prices.csv · 가격 + 반입량 903거래일)로 파이프라인 확인
+.venv/bin/uvicorn serving_app.main:app --port 8077          # 터미널 1 → localhost:8077 에서 data/tomato_prices.csv 업로드
+.venv/bin/python scripts/train_baseline_v1.py                # 터미널 2 → scaler.pkl + tomato_v1.keras
 .venv/bin/python serving_app/train_and_register.py           # MLflow 등록 + [GATE PASSED]
 # 터미널 1 재시작: MODEL_SOURCE=mlflow LOADING_MODE=eager .venv/bin/uvicorn serving_app.main:app --port 8077
 .venv/bin/python scripts/simulate_drift.py                   # [WARN] → 재학습 → [OK]
@@ -109,7 +109,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | 승격 시 이전 Production → Archived (롤백 대상 명확) | `train_and_register.py` | 3-4 |
 | (선택) 성능 회귀 테스트 — 새 RMSE ≤ 현재 Production RMSE | `train_and_register.py` | 3-1 |
 
-**먼저 할 것**: 컨테이너가 HAIC 그대로 한 번 뜨는지 확인 → 모델 이름 PR.
+**완료** (10/2): 모델 이름 #11 · 시드 CSV 토마토 + 게이트 612 #57 · 컨테이너 토마토 학습 540.04 통과.
 
 ### D 민영은 — 모니터링
 
@@ -164,7 +164,7 @@ B history.jsonl 형식 ──┬──▶ B 5분 집계 ──▶ D 지연 · �
 C 모델 이름 변경 ──▶ (B model_loader 리뷰 · D retrain_trigger 문구 리뷰)
 ```
 
-**병목은 A 의 CSV 와 임계값**입니다. 그동안 B · C · D 는 HAIC 샘플로 각자 기능을 먼저 만들고, 값만 나중에 바꿉니다.
+~~병목: A 의 CSV 와 임계값~~ → **해결 (10/2)**: 반입량 포함 토마토 CSV #40 · 임계값 612원/kg 확정 #45.
 
 ---
 

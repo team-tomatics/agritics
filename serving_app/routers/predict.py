@@ -8,7 +8,7 @@
    계산은 직접 하지 않고, 모델(model_loader)과 감시 도구(retrain_trigger)에게 맡깁니다.
 
 ■ 엔드포인트
-   [Day1] POST /predict             : 20일치 데이터 → 다음날 종가 1개   (완성 — 읽고 흐름만 이해하세요)
+   [Day1] POST /predict             : 25거래일 데이터 → 다음 거래일 도매가격 1개
    [Day3] POST /predict/batch-test  : 긴 가격 목록 → 여러 번 예측 → 드리프트 검사
 
 ■ 이 파일의 빈칸 : [빈칸 6]  (batch_test 의 슬라이딩 윈도우)
@@ -48,7 +48,7 @@ def simulated_volume() -> float:
 @router.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest, request: Request):
     """
-    [Day1] 다음날 종가 예측  (완성)
+    [Day1] 다음 거래일 도매가격 예측 (원/kg)
     받는 것  : {"sequence": [{"close": 160.0, "volume": 1200000}, ... 20개]}
                20개가 아니면 schemas.py 가 알아서 422 에러를 돌려줍니다.
     돌려줄 것: {"predicted_close": 161.37, "model_version": "v1-local"}

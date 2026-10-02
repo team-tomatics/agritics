@@ -2,7 +2,7 @@
 FastAPI 앱 진입점.
 
 Day1: app 생성, 라우터(predict, health) 등록, startup 이벤트에서 로딩 모드에 따라 모델 준비
-Day2: data 라우터 등록 (HAIC 데이터 업로드)
+Day2: data 라우터 등록 (시세 CSV 업로드)
 Day3: "aiops" 로거를 logs/aiops.log 파일로 연결(로깅 설정) + logs 라우터(로그 파일 조회) 등록
 
 정적 대시보드: serving_app/static/index.html 이 /health · /predict · /predict/batch-test ·
@@ -32,12 +32,12 @@ if not _aiops_logger.handlers:
     _aiops_logger.addHandler(_handler)
     _aiops_logger.addHandler(logging.StreamHandler())  # 터미널에서도 동일하게 확인 가능
 
-app = FastAPI(title="HAIC Serving & AIOps")
+app = FastAPI(title="농수산물 시세 예보 AIOps", description="가락시장 토마토 도매가격(원/kg) 다음 거래일 예측 · 드리프트 자동 재학습 · LLM 일일 보고서")
 app.middleware("http")(history_log.history_middleware)  # 팀 추가: 요청마다 logs/history.jsonl 한 줄
 
 app.include_router(predict.router)
 app.include_router(health.router)
-app.include_router(data.router)  # HAIC 데이터 업로드
+app.include_router(data.router)  # 시세 CSV 업로드
 app.include_router(logs.router)  # 대시보드: 재학습 로그 파일 조회
 app.include_router(report.router)  # 팀 추가: LLM 사이드카 일일 보고서
 app.include_router(metrics.router)  # 팀 추가: 5분 집계 지연 · 에러율

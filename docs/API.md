@@ -2,7 +2,7 @@
 
 > 소유: B 서빙 · 박유진 (`/data/*` 는 A 심준용, `/logs` 는 D 민영은 파일 — 동작이 바뀌면 소유자가 이 문서도 고친다)
 > 기준: 입력 25거래일 · 판정 윈도우 15건 (기획서 3-6). Swagger: `http://localhost:8077/docs` (컨테이너 `8099`)
-> 예시 값은 HAIC 샘플로 돌린 실제 응답이다. 토마토 CSV(반입량 포함)가 들어오면 원/kg 값으로 바뀐다.
+> 예시 값은 토마토 데이터(`data/tomato_prices.csv` 903거래일 · 반입량 포함)로 학습한 Production 모델(RMSE 540.04)에 실제로 보낸 응답이다 (10/2).
 
 ## 한눈에
 
@@ -29,18 +29,19 @@
 
 요청
 ```json
-{"sequence": [{"close": 3750.0, "volume": 120}, ... 25개]}
+{"sequence": [{"close": 4599.0, "volume": 158977}, {"close": 3817.0, "volume": 210513}, ... 25개]}
 ```
 | 필드 | 타입 | 규칙 |
 |---|---|---|
 | `sequence` | 배열 | 정확히 25개, 오래된 날 → 최근 날 |
 | `sequence[].close` | float | > 0 (도매가격 원/kg) |
-| `sequence[].volume` | int | ≥ 0 (반입량) |
+| `sequence[].volume` | int | ≥ 0 (가락시장 반입량 kg) |
 
 응답 200
 ```json
-{"predicted_close": 167.86, "model_version": "production-v4"}
+{"predicted_close": 3925.86, "model_version": "production-v1"}
 ```
+(입력: 실제 2026-08-29 ~ 09-29 25거래일. 다음날 09-30 실제 가격은 3,042원/kg — 예측이 틀린 날의 예시이기도 하다)
 - `model_version`: MLflow 로 불러오면 `production-vN` (재학습 승격 후 번호가 바뀜 · PR #20), 로컬 파일이면 `v1-local`
 
 에러 422 — 24개 · 26개 · 20개, `close = 0`, `volume = -1` 모두 실제 호출로 422 확인 (10/1, 응답 원문 · `input` 생략)
@@ -56,22 +57,24 @@
 
 ## POST /predict/batch-test
 
-드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, 최근 15건 RMSE 로 드리프트를 판정한다. 반입량은 고정값.
+드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, 최근 15건 RMSE 가 612원/kg 을 넘으면 드리프트로 판정한다. 반입량은 최근 업로드 CSV 의 중앙값(토마토 136,449kg, #49).
 
 요청 (보통 40개 = 25 + 15, `scripts/simulate_drift.py`)
 ```json
-{"prices": [165.0, 166.2, ... 40개]}
+{"prices": [2833.0, 2850.0, 2920.0, ... 40개]}
 ```
-응답 200
+응답 200 — 평온 구간 (실제 2025-03-28 ~ 05-13 40거래일)
 ```json
-{"predictions": [ ... 15개 ],
+{"predictions": [2539.5, 2492.9, 2439.9, ... 15개],
  "drift_check": {"status": "ok"}}
 ```
-드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트 → 승격
+드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트(612원/kg) · 회귀 테스트 → 통과하면 승격. 아래는 실제 2026-08-13 ~ 09-30 급등 구간 — 재학습한 모델도 게이트를 못 넘어 **기존 Production 유지**
 ```json
-{"predictions": [ ... 15개 ],
- "drift_check": {"status": "retrain_triggered", "promoted": true, "rmse": 1.45}}
+{"predictions": [4230.1, 4628.2, 4998.2, ... 15개],
+ "drift_check": {"status": "retrain_triggered", "promoted": false, "rmse": 1258.41}}
 ```
+통과하면 `"promoted": true` 와 새 `"rmse"` · 다음 `/predict` 의 `model_version` 이 `production-v2` 로 바뀐다
+(10/2 토마토 Production 모델 실측)
 - 승격되면 서버 모델 캐시를 비워 **다음 `/predict` 부터 새 버전**으로 응답한다 (기획서 3-4)
 - 재학습은 요청 안에서 동기로 돈다 (약 8초) — 기획서 3-4 #8 한계
 
@@ -109,12 +112,11 @@ batch-test 는 `count` 에서 빠진다: `/predict` 2회 + batch-test 2회(그�
 
 LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06:00 KST**(토마토 02:00 경매 기준) · 사이드카 시작 시 만든 최신 보고서. 서빙 프로세스는 LLM 을 부르지 않는다 (PR #16).
 ```json
-{"date": "2026-10-01", "generated_at": "2026-10-01T16:53:11+09:00",
- "source": "template", "error": "HTTPError: 401 Client Error: Unauthorized for url: https://api.openai.com/v1/chat/completions",
- "elapsed_s": 0.53, "item_name": "토마토", "model_version": "production", "drift_detected": true,
- "markdown": "**가격 급변 감지 — 오늘 예측 신뢰도 낮음**\n\n## 토마토 시세 일일 보고서\n..."}
+{"date": "2026-10-02", "source": "template", "error": "RuntimeError: OPENAI_API_KEY 없음", "elapsed_s": 0.0,
+ "item_name": "토마토", "model_version": "production-v1", "drift_detected": false,
+ "markdown": "## 토마토 시세 일일 보고서\n- 내일 예측가: **3,926원/kg** (오늘 3,350원/kg, +17.2%)\n- 예측 모델: production-v1\n..."}
 ```
-(위는 잘못된 키로 실제 OpenAI 를 부른 테스트 응답. LLM 이 성공하면 `source: "llm"`, `error: null`, `markdown` 은 LLM 문장. `model_version` 은 PR #20 머지 후 `production-vN`)
+(위 `/predict` 1건 뒤 키 없이 생성한 실제 응답. LLM 이 성공하면 `source: "llm"`, `error: null`, `markdown` 은 `report_sidecar/prompts/report.md` 규칙으로 쓴 LLM 문장. 잘못된 키면 `error: "HTTPError: 401 ..."`)
 - `source: "template"` — LLM 실패(키 없음 · 30초 초과 · 오류) 시 같은 숫자로 만든 정해진 양식, `error` 에 사유
 - `drift_detected: true` 면 본문 첫 줄이 "가격 급변 감지 — 오늘 예측 신뢰도 낮음"
 - 404 `{"detail": "아직 생성된 보고서가 없습니다 (python -m report_sidecar.generator)"}`
@@ -159,16 +161,16 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 ```json
 {"name": "aiops.log", "content": "2026-10-01 17:01:04,... [WARNING] [WARN] drift detected - triggering retrain\n..."}
 ```
-`aiops.log` 순서: `[WARN] drift detected` → `[INFO] retrain triggered (window=last_25_days)` → `[OK] new_rmse=1.45 - production promoted: <모델> v4`
+`aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`. 게이트 · 회귀 테스트에서 떨어지면 지금은 **로그가 남지 않는다** (위 급등 예시 — D 에 공유)
 
 ---
 
 ## 이력 로그 한 줄 (`logs/history.jsonl`)
 
 ```json
-{"ts": "2026-10-01T17:01:20+09:00", "method": "POST", "path": "/predict", "status": 200,
- "latency_ms": 18.7, "model_version": "production-v4", "predicted": 167.86,
- "input_last": {"close": 167.2, "volume": 1200000}}
+{"ts": "2026-10-02T09:43:19+09:00", "method": "POST", "path": "/predict", "status": 200,
+ "latency_ms": 153.0, "model_version": "production-v1", "predicted": 3925.86,
+ "input_last": {"close": 3350.0, "volume": 159212}}
 ```
 - 422 처럼 라우터까지 못 간 요청은 `ts · method · path · status · latency_ms` 만
 - batch-test 는 `n_predictions` · `drift_status` 추가

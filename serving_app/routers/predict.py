@@ -49,9 +49,9 @@ def simulated_volume() -> float:
 def predict(req: PredictRequest, request: Request):
     """
     [Day1] 다음 거래일 도매가격 예측 (원/kg)
-    받는 것  : {"sequence": [{"close": 160.0, "volume": 1200000}, ... 20개]}
-               20개가 아니면 schemas.py 가 알아서 422 에러를 돌려줍니다.
-    돌려줄 것: {"predicted_close": 161.37, "model_version": "v1-local"}
+    받는 것  : {"sequence": [{"close": 4599.0, "volume": 158977}, ... 25개]}   (가격 원/kg · 반입량 kg, 오래된 날 → 최근 날)
+               25개가 아니거나 가격 ≤ 0 · 반입량 < 0 이면 schemas.py 가 422 에러를 돌려줍니다.
+    돌려줄 것: {"predicted_close": 3925.86, "model_version": "production-v1"}   (실제 2026-08-29 ~ 09-29 입력)
 
     흐름: 모델 가져오기(get_model) → dict 목록으로 변환 → predict_one → 응답 포장
     핵심 계산은 모두 model_loader.predict_one() 안에 있습니다. ([빈칸 2], [빈칸 3])
@@ -68,23 +68,24 @@ def predict(req: PredictRequest, request: Request):
 def batch_test(req: BatchTestRequest, request: Request):
     """
     [Day3] 드리프트 시뮬레이션
-    받는 것  : {"prices": [165.0, 166.2, ... 41개]}   (scripts/simulate_drift.py 가 보냄)
-    돌려줄 것: {"predictions": [예측값 21개], "drift_check": {"status": "ok"} 또는 재학습 결과}
+    받는 것  : {"prices": [2833.0, 2850.0, ... 40개]}   (원/kg, scripts/simulate_drift.py 가 보냄)
+    돌려줄 것: {"predictions": [예측값 15개], "drift_check": {"status": "ok"} 또는 재학습 결과}
+               반입량은 최근 업로드 CSV 의 중앙값으로 채운다 (#49)
 
-    ■ 핵심 아이디어: 슬라이딩 윈도우 (20칸짜리 창문을 한 칸씩 밀기)
-      가격 41개가 들어오면, 20개씩 잘라 "그다음 날"을 예측하고 실제 값과 비교합니다.
+    ■ 핵심 아이디어: 슬라이딩 윈도우 (25칸짜리 창문을 한 칸씩 밀기)
+      가격 40개가 들어오면, 25개씩 잘라 "그다음 날"을 예측하고 실제 값과 비교합니다.
 
-        i=0 : [p0  ~ p19] → 예측   vs  실제 p20
-        i=1 : [p1  ~ p20] → 예측   vs  실제 p21
+        i=0 : [p0  ~ p24] → 예측   vs  실제 p25
+        i=1 : [p1  ~ p25] → 예측   vs  실제 p26
         ...
-        i=20: [p20 ~ p39] → 예측   vs  실제 p40
-        → 총 41 - 20 = 21번 예측 = 드리프트 판단에 필요한 21건이 딱 채워집니다.
+        i=14: [p14 ~ p38] → 예측   vs  실제 p39
+        → 총 40 - 25 = 15번 예측 = 드리프트 판단에 필요한 15건이 딱 채워집니다 (612원/kg 기준).
 
     확인 방법
       python scripts/simulate_drift.py
         [normal]          drift_check = {'status': 'ok'}
-        [drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True, ...}
-      /docs 에서 직접 호출할 때는 predictions 가 (가격 개수 - 20)개인지 확인하세요.
+        [drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True 또는 False, 'rmse': ...}
+      /docs 에서 직접 호출할 때는 predictions 가 (가격 개수 - 25)개인지 확인하세요.
     """
     model = model_loader.get_model()
     predictions: list[float] = []
@@ -104,7 +105,7 @@ def batch_test(req: BatchTestRequest, request: Request):
         sequence = [{"close": p, "volume": volume} for p in window]
         pred = model.predict_one(sequence)
         actual = prices[i + SEQ_LEN]
-        predictions.append(pred)
+        predictions.append(round(pred, 2))  # /predict 와 같은 소수 둘째 자리 (드리프트 RMSE 는 원값 recent_predictions 로 계산)
         recent_predictions.append({"predicted": pred, "actual": actual})
 
     # 최근 WINDOW_SIZE(15)건만 남기기 — 오래된 기록까지 섞이면 "지금" 상태를 판단할 수 없습니다.

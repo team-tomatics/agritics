@@ -2,7 +2,7 @@
 학습 · 게이트 · MLflow 등록 · fine-tune 재학습
 
 작성자: 황재원 (원본: 교수님 스켈레톤)
-버전: v0.7.0 (2026-10-02)
+버전: v0.8.0 (2026-10-02)
 변경 이력:
   v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본)
   v0.2.0  #11  모델 이름 Tomato_Price_Predictor
@@ -11,6 +11,7 @@
   v0.5.0  #48  게이트 탈락 시 exit 1 — Docker 빌드에서 바로 실패
   v0.6.0  #57  게이트 612원/kg (박유진)
   v0.7.0  #75  PriceVolumeScaler · 토마토 문구 (박유진)
+  v0.8.0  #86  최초 Production 승격을 aiops.log 에 기록 (민영은)
 
 Day2: MLflow로 토마토 시세 LSTM 모델을 학습 -> 기록(Tracking) -> 게이트 검증 -> 등록(Registry) -> Production 승격.
 Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 fine-tuning 재학습.
@@ -41,6 +42,7 @@ from tensorflow import keras
 from data.features import load_rows, build_sequences, train_test_split, PriceVolumeScaler
 from data.storage import latest_upload
 from serving_app.lstm_model import build_model
+from serving_app.monitoring.promotion_log import log_promotion
 
 # 시드 고정: LSTM 가중치 초기화가 랜덤이라 시드 없이는 실행마다 RMSE가 크게 흔들려
 # (토마토 실측: 시드 42 · 1 · 7 · 123 · 2026 → 540.0 · 487.6 · 510.4 · 488.7 · 499.6원/kg, 기획서 3-6)
@@ -128,7 +130,10 @@ def train_and_register(csv_path: str | None = None, rows: list[dict] | None = No
 
         if prod_score is not None:
             mlflow.log_metric("prod_rmse", prod_score)
-        return _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
+        result = _register_if_gate_passed(model, mlflow.active_run().info.run_id, score, prod_score)
+        if result["promoted"]:
+            log_promotion(result["rmse"], MODEL_NAME, result["version"])
+        return result
 
 
 def fine_tune(rows: list[dict]) -> dict:

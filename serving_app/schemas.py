@@ -13,8 +13,8 @@ from data.features import SEQ_LEN
 
 
 class DailyPoint(BaseModel):
-    close: float = Field(..., gt=0, description="해당 거래일 종가")
-    volume: int = Field(..., ge=0, description="해당 거래일 거래량")
+    close: float = Field(..., gt=0, description="해당 거래일 도매가격 (원/kg)")
+    volume: int = Field(..., ge=0, description="해당 거래일 가락시장 반입량 (kg)")
 
 
 class PredictRequest(BaseModel):
@@ -33,8 +33,8 @@ class PredictResponse(BaseModel):
 
 class BatchTestRequest(BaseModel):
     # Day3 드리프트 시뮬레이션에서 사용 (scripts/simulate_drift.py 참고)
-    # SEQ_LEN + N 개의 연속된 종가를 보내면, 서버가 내부적으로 슬라이딩 윈도우로 잘라
-    # 여러 건을 연속 예측한다. (거래량은 시뮬레이션이므로 고정값을 사용)
+    # SEQ_LEN + N 개의 연속된 도매가격을 보내면, 서버가 내부적으로 슬라이딩 윈도우로 잘라
+    # 여러 건을 연속 예측한다. (반입량은 최근 업로드 CSV 의 중앙값 — routers/predict.py, #49)
     prices: list[float] = Field(..., min_length=SEQ_LEN + 1)
 
 

@@ -17,9 +17,9 @@ cd agritics
 python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 
-# 지금은 HAIC 샘플로 파이프라인이 끝까지 도는지 확인 (토마토 CSV 는 A 가 머지한 뒤)
-.venv/bin/uvicorn serving_app.main:app --port 8077          # 터미널 1 → localhost:8077 에서 data/sample_haic_prices.csv 업로드
-.venv/bin/python scripts/train_baseline_v1.py                # 터미널 2 → scaler.pkl + haic_v1.keras
+# 토마토 데이터(data/tomato_prices.csv · 가격 + 반입량 903거래일)로 파이프라인 확인
+.venv/bin/uvicorn serving_app.main:app --port 8077          # 터미널 1 → localhost:8077 에서 data/tomato_prices.csv 업로드
+.venv/bin/python scripts/train_baseline_v1.py                # 터미널 2 → scaler.pkl + tomato_v1.keras
 .venv/bin/python serving_app/train_and_register.py           # MLflow 등록 + [GATE PASSED]
 # 터미널 1 재시작: MODEL_SOURCE=mlflow LOADING_MODE=eager .venv/bin/uvicorn serving_app.main:app --port 8077
 .venv/bin/python scripts/simulate_drift.py                   # [WARN] → 재학습 → [OK]

@@ -1,5 +1,5 @@
-# Day2: HAIC 서빙 앱 컨테이너 이미지 (단일 컨테이너)
-# 빌드/실행은 반드시 프로젝트 루트에서: docker build -f serving_app/Dockerfile -t haic-serving:v2 .
+# Day2: 농수산물 시세 예보 서빙 앱 컨테이너 이미지 (토마토 시드로 빌드 때 학습)
+# 빌드/실행은 반드시 프로젝트 루트에서: docker build -f serving_app/Dockerfile -t agritics-serving:v2 .
 # 참고: tensorflow가 들어가서 이미지가 (scikit-learn만 쓸 때보다) 훨씬 큽니다
 #       (1GB대) - 빌드에 몇 분 걸릴 수 있습니다. (GPU 없는 컨테이너이지만 CPU로 정상 동작합니다)
 #

@@ -27,8 +27,3 @@ python scripts/fetch_kamis.py merge \
 
 Volume 데이터가 바뀌면 기존 스케일러와 모델을 이어서 사용하지 않는다. 스케일러를
 다시 fit하고 모델을 처음부터 학습·등록해야 한다.
-
-## `sample_haic_prices.csv`
-
-기존 파이프라인 비교·비상 복구용 샘플이다. Dockerfile과 드리프트 시뮬레이터가
-`tomato_prices.csv`로 전환된 뒤 제거한다.

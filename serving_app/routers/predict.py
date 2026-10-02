@@ -27,8 +27,22 @@ router = APIRouter()
 #        드리프트 판단은 "최근 WINDOW_SIZE(15)건"(drift_detector.py)만 보므로 그만큼만 유지합니다.
 recent_predictions: list[dict] = []
 
-# (Day3) 시뮬레이션은 종가만 보내므로, 거래량은 이 값으로 고정해서 채웁니다.
-SIMULATED_VOLUME = 1_200_000
+# (Day3) 시뮬레이션은 가격만 보내므로 반입량은 고정값으로 채운다.
+# 팀: HAIC 거래량 1,200,000 은 토마토 반입량(최대 약 36만 kg)의 3배라 스케일러 범위 밖 → 예측이 크게 틀어져
+#     가짜 드리프트가 났다 (#49). 최근 업로드 CSV 의 반입량 중앙값을 쓴다 — 품목 · 데이터가 바뀌어도 학습 범위 안.
+DEFAULT_SIMULATED_VOLUME = 136_449  # 토마토 903행 반입량 중앙값(kg) — 업로드가 없을 때만
+
+
+def simulated_volume() -> float:
+    try:
+        import statistics
+
+        from data.features import load_rows
+        from data.storage import latest_upload
+
+        return statistics.median(r["Volume"] for r in load_rows(latest_upload()))
+    except Exception:  # noqa: BLE001 — 업로드 없음 · 읽기 실패여도 시뮬레이션은 돈다
+        return DEFAULT_SIMULATED_VOLUME
 
 
 @router.post("/predict", response_model=PredictResponse)
@@ -76,6 +90,7 @@ def batch_test(req: BatchTestRequest, request: Request):
     predictions: list[float] = []
 
     prices = req.prices
+    volume = simulated_volume()
     for i in range(len(prices) - SEQ_LEN):
         # ════════════════════════════ [빈칸 6] ════════════════════════════
         # i번째 창문(window)의 시작·끝 위치와, 그 창문 바로 다음 날(actual)의 위치를 채우세요. (i 와 SEQ_LEN 으로)
@@ -86,7 +101,7 @@ def batch_test(req: BatchTestRequest, request: Request):
         #     · 실제 값을 한 칸 앞(창문의 마지막 날)으로 잡으면, 모델은 무엇을 "맞힌" 셈이 될까요?
         #     · 반대로 창문을 한 칸 더 길게 잡아서 실제 값이 창문 안에 들어가면 RMSE는 어떻게 될까요?
         window = prices[i : i + SEQ_LEN]
-        sequence = [{"close": p, "volume": SIMULATED_VOLUME} for p in window]
+        sequence = [{"close": p, "volume": volume} for p in window]
         pred = model.predict_one(sequence)
         actual = prices[i + SEQ_LEN]
         predictions.append(pred)

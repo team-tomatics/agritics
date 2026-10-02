@@ -2,9 +2,9 @@
 Day3 드리프트 감지 시뮬레이션 (119~123번 슬라이드).
 
 핵심 프로세스:
-    1) 기준 통계 산출   - 토마토 3년치 가격의 평균·일별 로그수익률 변동성 계산
+    1) 기준 통계 산출   - 저장소의 토마토 3년치 가격으로 평균·일별 로그수익률 변동성 계산
     2) 정상 입력 테스트 - 평온 구간 변동성의 데이터로 예측 -> RMSE 임계값 이내 확인
-    3) 폭염 데이터 생성 - 변동성을 인위적으로 3배 키운 가격 데이터 생성
+    3) 폭염 데이터 생성 - 변동성을 인위적으로 4배 키운 가격 데이터 생성
     4) 드리프트 데이터 주입 - 생성한 데이터를 서빙 서버에 연속 요청으로 전송
     5) 결과 관찰       - RMSE 상승 -> 알림 로그 발생 -> 재학습 트리거 확인
 
@@ -29,7 +29,6 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.features import load_rows
-from data.storage import latest_upload
 
 # 보낼 서버 목록. API_URL 은 main() 에서 --target 에 따라 바뀝니다.
 TARGETS = {
@@ -38,18 +37,13 @@ TARGETS = {
 }
 API_URL = f"{TARGETS['local']}/predict/batch-test"
 
-# 기준 통계용 데이터: 호스트의 data/uploads/ 에 업로드한 CSV가 없으면 학습에 쓰인 예시 데이터로 계산합니다.
+# 데모 기준 통계는 남아 있는 업로드 파일의 영향을 받지 않도록 저장소의 토마토 데이터로 고정합니다.
 SAMPLE_CSV = "data/tomato_prices.csv"
 
 
 def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:
     """1단계: 학습 데이터의 평균 가격·일별 로그수익률 표준편차."""
-    if csv_path is None:
-        try:
-            csv_path = latest_upload()
-        except FileNotFoundError:
-            csv_path = SAMPLE_CSV
-            print(f"[info] 업로드된 CSV가 없어 {SAMPLE_CSV} 로 기준 통계를 계산합니다.")
+    csv_path = csv_path or SAMPLE_CSV
     rows = load_rows(csv_path)
     closes = np.array([r["Close"] for r in rows])
     return float(closes.mean()), float(np.diff(np.log(closes)).std())
@@ -65,7 +59,7 @@ BATCH_N = 40
 # 만들고, 그 수익률의 표준편차(변동성)만 다르게 줍니다.
 DEFAULT_BASE_PRICE = 3722.87  # data/tomato_prices.csv 903거래일 평균 (원/kg)
 NORMAL_SIGMA = 0.045247  # 평온 구간(2025-03-28부터 40거래일) 로그수익률 표준편차
-DRIFT_SIGMA = NORMAL_SIGMA * 3  # 폭염 급등락을 재현하는 3배 변동성
+DRIFT_SIGMA = NORMAL_SIGMA * 4  # 시드 42 실측 RMSE 713.86원/kg > 드리프트 기준 612
 RANDOM_SEED = 42
 
 
@@ -80,7 +74,7 @@ def generate_normal_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=NORMAL_SIGMA
 
 
 def generate_drift_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=DRIFT_SIGMA):
-    """변동성을 3배 키운 폭염 입력 (의도적으로 오차 유발)."""
+    """변동성을 4배 키운 폭염 입력 (의도적으로 오차 유발)."""
     return _random_walk(n, base, sigma)
 
 

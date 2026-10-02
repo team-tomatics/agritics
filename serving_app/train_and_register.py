@@ -4,7 +4,7 @@ Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 
 
 실습 시나리오 (94번 슬라이드를 LSTM 버전으로 재구성):
     1) HAIC 데이터로 base 모델 학습(50 epoch) -> RMSE 확인 (게이트 미달 가능)
-    2) 게이트($4.00) 통과 시 Production으로 승격
+    2) 게이트(612원/kg) 통과 시 Production으로 승격
     3) (Day3) 드리프트 감지 시 Production 가중치에서 warm-start -> 최근 1개월 데이터로
        10 epoch만 fine-tuning (처음부터 다시 학습하지 않음 - 21거래일로는 스크래치 학습이 불안정)
 
@@ -35,7 +35,7 @@ from serving_app.lstm_model import build_model
 SEED = 42
 keras.utils.set_random_seed(SEED)
 
-RMSE_GATE = 4.00
+RMSE_GATE = 612.0  # 원/kg — 토마토 3년 단순 예측("내일 = 오늘") RMSE. 기획서 3-1 기본값 · 실험 후 확정 (#45)
 MODEL_NAME = "Tomato_Price_Predictor"
 SCALER_PATH = "serving_app/models/scaler.pkl"
 BASE_EPOCHS = 100  # 3층 LSTM + 3년치 데이터 기준, RMSE가 안정적으로 게이트 아래로 수렴하는 지점

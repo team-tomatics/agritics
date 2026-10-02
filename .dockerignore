@@ -1,0 +1,35 @@
+# [C MLOps] 빌드 컨텍스트(레포 루트)에서 이미지에 넣지 않을 것 — 각자 PC 산출물 · 비밀 · 가상환경 (#77)
+# .gitignore 와 같은 대상. 빌드가 쓰는 폴더 자체는 .gitkeep 으로 남긴다.
+
+.git
+.github
+.DS_Store
+**/__pycache__
+**/*.pyc
+.ruff_cache
+
+# 가상환경
+.venv
+.venv*
+venv
+env
+ENV
+aiops
+
+# 환경변수 / API 키 — 사이드카는 compose env_file 로만 받는다
+.env
+.env.*
+
+# 학습 · 서빙 산출물 — 이미지 빌드 때 새로 만든다
+mlflow.db
+mlruns
+mlartifacts
+serving_app/models/*
+!serving_app/models/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+logs
+outputs
+
+reference
+*.zip

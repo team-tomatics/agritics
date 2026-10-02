@@ -39,7 +39,7 @@ TARGETS = {
 API_URL = f"{TARGETS['local']}/predict/batch-test"
 
 # 기준 통계용 데이터: 호스트의 data/uploads/ 에 업로드한 CSV가 없으면 학습에 쓰인 예시 데이터로 계산합니다.
-SAMPLE_CSV = "data/sample_haic_prices.csv"
+SAMPLE_CSV = "data/tomato_prices.csv"
 
 
 def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:

@@ -201,7 +201,7 @@
 // 서버(data/features.py, monitoring/drift_detector.py)와 동일한 값 (상수만 복제)
 const SEQ_LEN = 25;
 const WINDOW_SIZE = 15;
-const RMSE_THRESHOLD = 4.0;
+const RMSE_THRESHOLD = 612.0; // 원/kg (#45)
 
 let lastPipelineRun = null; // { driftCheck, clientRmse, ts }
 

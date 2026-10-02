@@ -38,6 +38,14 @@ class TomatoDriftScenarioTests(unittest.TestCase):
         self.assertIn("np.random.default_rng(seed)", Path("scripts/simulate_drift.py").read_text(encoding="utf-8"))
         self.assertIn("seededRandom(seed)", html)
 
+    def test_heatwave_multiplier_matches_dashboard_and_uses_canonical_baseline(self):
+        script = Path("scripts/simulate_drift.py").read_text(encoding="utf-8")
+        html = Path("serving_app/static/index.html").read_text(encoding="utf-8")
+
+        self.assertIn("DRIFT_SIGMA = NORMAL_SIGMA * 4", script)
+        self.assertIn("const DRIFT_SIGMA = NORMAL_SIGMA * 4", html)
+        self.assertNotIn("latest_upload", script)
+
 
 if __name__ == "__main__":
     unittest.main()

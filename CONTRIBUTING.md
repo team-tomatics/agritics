@@ -185,7 +185,7 @@ PR 을 올리면 `검사` 가 자동으로 돕니다.
 | --- | --- |
 | 브랜치 이름 `<type>/<이슈번호>-<slug>` (PR 만) | ❌ 실패 — 브랜치를 새 이름으로 다시 만들어 PR |
 | API 키 하드코딩 (`sk-`, `sk-ant-`, `..._KEY = "..."`) | ❌ 실패 — `.env` 로 옮기기 |
-| 커밋 금지 파일 (`.env`, `mlflow.db`, `mlruns/`, `*.keras`, `scaler.pkl`, `data/uploads/*.csv`, `logs/*`, `reference/`) | ❌ 실패 — `git rm --cached` |
+| 커밋 금지 파일 (`.env`, `mlflow.db`, `mlruns/`, `*.keras`, `scaler.pkl`, `data/uploads/*.csv`, `logs/*`, `reference/`, **가상환경** — 폴더 이름과 상관없이 `pyvenv.cfg` · `site-packages/` · `bin/python`) | ❌ 실패 — `git rm -r --cached <폴더>` |
 | `ruff check` (문법 오류 · 정의 안 된 이름만) | ❌ 실패 |
 | 공유 상수 일치 (`scripts/check_constants.py`) | ❌ 실패 — ROLES.md 3장 위치 전부 고치기 |
 

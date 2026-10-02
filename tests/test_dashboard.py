@@ -40,6 +40,10 @@ class DashboardTest(unittest.TestCase):
         for name in ("SEQ_LEN", "WINDOW_SIZE", "RMSE_THRESHOLD"):
             self.assertRegex(HTML, rf"const {name} = [0-9.]+;")
 
+    def test_retrain_failure_is_visible_in_alerts_and_pipeline(self):
+        self.assertGreaterEqual(HTML.count('event.line.includes("[FAIL]")'), 2)
+        self.assertIn('last.line.includes("[FAIL]")', HTML)
+
 
 if __name__ == "__main__":
     unittest.main()

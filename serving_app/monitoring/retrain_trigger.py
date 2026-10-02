@@ -16,8 +16,10 @@
    python scripts/simulate_drift.py 실행 후, logs/aiops.log (또는 대시보드 "재학습 로그")에
    아래 3줄이 순서대로 찍히면 성공입니다.
      [WARN] drift detected - triggering retrain
-     [INFO] retrain triggered (window=last_21_days)
+     [INFO] retrain triggered (window=last_25_days)
      [OK] new_rmse=1.47 - production promoted: Tomato_Price_Predictor v2
+   게이트나 회귀 테스트에서 떨어지면 마지막 줄 대신 아래 실패 로그가 남습니다.
+     [FAIL] new_rmse=1258.41 - gate/regression failed, keep current Production
    ※ 로그 문장은 대시보드가 읽으니 글자를 바꾸지 마세요.
 
 ■ 이 파일의 빈칸 : [빈칸 9] 데이터 범위   [빈칸 10] 학습 방식   [빈칸 11] 승격 여부
@@ -93,4 +95,7 @@ def check_and_trigger(recent_predictions: list[dict]) -> dict:
             f"[OK] new_rmse={result['rmse']:.2f} - production promoted: Tomato_Price_Predictor v{result['version']}"
         )
         return {"status": "retrain_triggered", "promoted": True, "rmse": result["rmse"]}
+    logger.warning(
+        f"[FAIL] new_rmse={result['rmse']:.2f} - gate/regression failed, keep current Production"
+    )
     return {"status": "retrain_triggered", "promoted": False, "rmse": result["rmse"]}

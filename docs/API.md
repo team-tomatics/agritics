@@ -161,7 +161,7 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 ```json
 {"name": "aiops.log", "content": "2026-10-01 17:01:04,... [WARNING] [WARN] drift detected - triggering retrain\n..."}
 ```
-`aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`. 게이트 · 회귀 테스트에서 떨어지면 지금은 **로그가 남지 않는다** (위 급등 예시 — D 에 공유)
+`aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`, 게이트 · 회귀 테스트에서 떨어지면 `[FAIL] new_rmse=... - gate/regression failed, keep current Production`.
 
 ---
 

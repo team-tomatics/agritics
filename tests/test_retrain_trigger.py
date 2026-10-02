@@ -36,11 +36,20 @@ class RetrainWindowTests(unittest.TestCase):
                         "serving_app.train_and_register": trainer,
                     }),
                 ):
-                    result = retrain_trigger.check_and_trigger(records)
+                    with self.assertLogs("aiops", level="WARNING") as logs:
+                        result = retrain_trigger.check_and_trigger(records)
 
                 self.assertEqual(result["promoted"], promoted)
                 self.assertEqual(records, [] if promoted else [{"predicted": 1, "actual": 2}] * 15)
                 self.assertEqual(loader._model_cache, None if promoted else "old-model")
+                failure_logs = [message for message in logs.output if "[FAIL]" in message]
+                if promoted:
+                    self.assertEqual(failure_logs, [])
+                else:
+                    self.assertEqual(
+                        failure_logs,
+                        ["WARNING:aiops:[FAIL] new_rmse=100.00 - gate/regression failed, keep current Production"],
+                    )
 
 
 if __name__ == "__main__":

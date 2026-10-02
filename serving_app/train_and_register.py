@@ -1,4 +1,17 @@
 """
+학습 · 게이트 · MLflow 등록 · fine-tune 재학습
+
+작성자: 황재원 (원본: 교수님 스켈레톤)
+버전: v0.7.0 (2026-10-02)
+변경 이력:
+  v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본)
+  v0.2.0  #11  모델 이름 Tomato_Price_Predictor
+  v0.3.0  #15  승격 시 이전 Production Archived + 회귀 테스트
+  v0.4.0  #24  Production 채점을 학습 뒤로 — SEED 재현성
+  v0.5.0  #48  게이트 탈락 시 exit 1 — Docker 빌드에서 바로 실패
+  v0.6.0  #57  게이트 612원/kg (박유진)
+  v0.7.0  #75  PriceVolumeScaler · 토마토 문구 (박유진)
+
 Day2: MLflow로 토마토 시세 LSTM 모델을 학습 -> 기록(Tracking) -> 게이트 검증 -> 등록(Registry) -> Production 승격.
 Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 fine-tuning 재학습.
 

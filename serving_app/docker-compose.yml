@@ -1,3 +1,11 @@
+# 서빙 앱 + 보고서 사이드카 compose
+#
+# 작성자: 황재원 (원본: 교수님 스켈레톤)
+# 버전: v0.2.0 (2026-10-01)
+# 변경 이력:
+#   v0.1.0  —    교수님 스켈레톤 원본 (serving-app 단일 서비스)
+#   v0.2.0  #17  report-sidecar 서비스 · logs/outputs 볼륨 공유 · env_file
+#
 # Day2: FastAPI 서빙 앱 컨테이너 + LLM 보고서 사이드카
 #
 # MLflow는 별도 서버 없이 이 컨테이너 안에서 로컬 sqlite로 트래킹합니다(Dockerfile 참고).

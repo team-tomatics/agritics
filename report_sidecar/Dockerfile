@@ -1,3 +1,11 @@
+# 보고서 사이드카 이미지
+#
+# 작성자: 황재원
+# 버전: v1.1.0 (2026-10-01)
+# 변경 이력:
+#   v1.0.0  #17  사이드카 이미지 (requests · fastapi · history_log)
+#   v1.1.0  #46  --at 06:00 · PYTHONUNBUFFERED
+#
 # LLM 일일 보고서 사이드카 — 예측 컨테이너와 분리 (LLM 이 죽어도 /predict 는 산다, 기획서 ①)
 # 빌드 · 실행은 serving_app/docker-compose.yml 의 report-sidecar 서비스로.
 #

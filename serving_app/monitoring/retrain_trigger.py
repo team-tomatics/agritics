@@ -88,6 +88,7 @@ def check_and_trigger(recent_predictions: list[dict]) -> dict:
         # (모듈 이름을 붙여서 바꿔야 model_loader 쪽 전역 변수가 바뀐다)
         from serving_app import model_loader
         model_loader._model_cache = None
+        recent_predictions.clear()
         logger.info(
             f"[OK] new_rmse={result['rmse']:.2f} - production promoted: Tomato_Price_Predictor v{result['version']}"
         )

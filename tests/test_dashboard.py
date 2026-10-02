@@ -37,8 +37,16 @@ class DashboardTest(unittest.TestCase):
             self.assertNotIn(fake_value, HTML)
 
     def test_shared_constants_remain_machine_checkable(self):
-        for name in ("SEQ_LEN", "WINDOW_SIZE", "RMSE_THRESHOLD"):
+        for name in ("SEQ_LEN", "WINDOW_SIZE", "RMSE_THRESHOLD", "WAPE_THRESHOLD"):
             self.assertRegex(HTML, rf"const {name} = [0-9.]+;")
+
+    def test_drift_threshold_matches_server_and_is_shown_as_wape(self):
+        detector = Path("serving_app/monitoring/drift_detector.py").read_text(encoding="utf-8")
+        server = float(re.search(r"^WAPE_THRESHOLD = ([0-9.]+)", detector, re.M).group(1))
+        html = float(re.search(r"const WAPE_THRESHOLD = ([0-9.]+);", HTML).group(1))
+        self.assertEqual(html, server)
+        self.assertIn('["감지", "WAPE 판정"]', HTML)
+        self.assertIn("data.drift_check?.wape", HTML)
 
     def test_retrain_failure_is_visible_in_alerts_and_pipeline(self):
         self.assertGreaterEqual(HTML.count('event.line.includes("[FAIL]")'), 2)

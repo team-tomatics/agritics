@@ -42,8 +42,9 @@ class TomatoDriftScenarioTests(unittest.TestCase):
         script = Path("scripts/simulate_drift.py").read_text(encoding="utf-8")
         html = Path("serving_app/static/index.html").read_text(encoding="utf-8")
 
-        self.assertIn("DRIFT_SIGMA = NORMAL_SIGMA * 4", script)
-        self.assertIn("const DRIFT_SIGMA = NORMAL_SIGMA * 4", html)
+        # σ×4 는 15건 WAPE 11.1% 라 드리프트 기준 18% 를 못 넘는다 (#106)
+        self.assertIn("DRIFT_SIGMA = NORMAL_SIGMA * 8", script)
+        self.assertIn("const DRIFT_SIGMA = NORMAL_SIGMA * 8", html)
         self.assertNotIn("latest_upload", script)
 
 

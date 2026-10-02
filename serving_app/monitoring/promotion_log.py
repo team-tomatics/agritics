@@ -8,8 +8,9 @@ LOG_PATH = "logs/aiops.log"
 logger = logging.getLogger("aiops")
 
 
-def log_promotion(rmse: float, model_name: str, version: str) -> None:
-    message = f"[OK] new_rmse={rmse:.2f} - production promoted: {model_name} v{version}"
+def log_promotion(rmse: float, model_name: str, version: str, extra: str = "") -> None:
+    """extra 는 줄 끝에 덧붙일 문자열 (예: " (mae=… wape=…% bias=…%)") — 앞부분은 대시보드 · 보고서가 읽는 형식 그대로."""
+    message = f"[OK] new_rmse={rmse:.2f} - production promoted: {model_name} v{version}{extra}"
     if logger.handlers:
         logger.info(message)
         return

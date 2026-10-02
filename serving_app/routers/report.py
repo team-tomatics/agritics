@@ -3,7 +3,8 @@ GET /report — 일일 보고서 (기획서 ② 핵심 기능)
 
 작성자: 박유진
 버전: v1.0.0 (2026-10-01)
-변경: #16 최초 작성
+변경 이력:
+  v1.0.0  #16  최신 보고서 반환 · 없으면 404
 
 report_sidecar(generator.py) 가 만든 최신 보고서(outputs/reports/YYYY-MM-DD.md + .json)를 돌려준다.
 서빙 프로세스는 LLM 을 부르지 않는다 — LLM 이 느리거나 죽어도 /predict 는 영향이 없다 (사이드카로 분리한 이유).

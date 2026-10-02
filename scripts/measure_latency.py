@@ -3,7 +3,8 @@ Lazy / Eager 지연 측정 (기획서 ② 응답 시간 "첫 요청 포함 1초 
 
 작성자: 박유진
 버전: v1.0.0 (2026-10-01)
-변경: #22 최초 작성
+변경 이력:
+  v1.0.0  #22  Lazy / Eager 3회 측정
 
 모드마다 서버를 새 프로세스로 띄워(캐시 없는 상태) 아래를 잰다. 프로젝트 루트에서:
     python scripts/measure_latency.py                    # lazy · eager 각 3회, MODEL_SOURCE=mlflow

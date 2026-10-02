@@ -3,7 +3,11 @@
 
 작성자: 박유진
 버전: v1.3.0 (2026-10-01)
-변경: #4 최초 작성 · #20 버전 표시 · #26 /predict 기준 집계 · #32 P95·1% 기준
+변경 이력:
+  v1.0.0  #4   요청마다 history.jsonl 한 줄 기록 · 5분 집계
+  v1.1.0  #20  model_version 예시 production-vN
+  v1.2.0  #26  지연 · 에러율을 /predict 만으로 집계
+  v1.3.0  #32  기준 P95 > 500ms · 5xx > 1%
 
 요청마다 logs/history.jsonl 에 JSON 한 줄을 남긴다. 보고서(GET /report)와
 응답 지연(P95 > 500ms) · 에러율(5xx > 1%) 지표의 원천이다.

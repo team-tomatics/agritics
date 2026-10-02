@@ -2,7 +2,7 @@
 
 > 소유: B 서빙 · 박유진 (`/data/*` 는 A 심준용, `/logs` 는 D 민영은 파일 — 동작이 바뀌면 소유자가 이 문서도 고친다)
 > 기준: 입력 25거래일 · 판정 윈도우 15건 (기획서 3-6). Swagger: `http://localhost:8077/docs` (컨테이너 `8099`)
-> 예시 값은 HAIC 샘플로 돌린 실제 응답이다. 토마토 CSV(반입량 포함)가 들어오면 원/kg 값으로 바뀐다.
+> 예시 값은 토마토 데이터(`data/tomato_prices.csv` 903거래일 · 반입량 포함)로 학습한 Production 모델(RMSE 540.04)에 실제로 보낸 응답이다 (10/2).
 
 ## 한눈에
 
@@ -35,12 +35,13 @@
 |---|---|---|
 | `sequence` | 배열 | 정확히 25개, 오래된 날 → 최근 날 |
 | `sequence[].close` | float | > 0 (도매가격 원/kg) |
-| `sequence[].volume` | int | ≥ 0 (반입량) |
+| `sequence[].volume` | int | ≥ 0 (가락시장 반입량 kg) |
 
 응답 200
 ```json
-{"predicted_close": 167.86, "model_version": "production-v4"}
+{"predicted_close": 3925.86, "model_version": "production-v1"}
 ```
+(입력: 실제 2026-08-29 ~ 09-29 25거래일. 다음날 09-30 실제 가격은 3,042원/kg — 예측이 틀린 날의 예시이기도 하다)
 - `model_version`: MLflow 로 불러오면 `production-vN` (재학습 승격 후 번호가 바뀜 · PR #20), 로컬 파일이면 `v1-local`
 
 에러 422 — 24개 · 26개 · 20개, `close = 0`, `volume = -1` 모두 실제 호출로 422 확인 (10/1, 응답 원문 · `input` 생략)
@@ -109,12 +110,11 @@ batch-test 는 `count` 에서 빠진다: `/predict` 2회 + batch-test 2회(그�
 
 LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06:00 KST**(토마토 02:00 경매 기준) · 사이드카 시작 시 만든 최신 보고서. 서빙 프로세스는 LLM 을 부르지 않는다 (PR #16).
 ```json
-{"date": "2026-10-01", "generated_at": "2026-10-01T16:53:11+09:00",
- "source": "template", "error": "HTTPError: 401 Client Error: Unauthorized for url: https://api.openai.com/v1/chat/completions",
- "elapsed_s": 0.53, "item_name": "토마토", "model_version": "production", "drift_detected": true,
- "markdown": "**가격 급변 감지 — 오늘 예측 신뢰도 낮음**\n\n## 토마토 시세 일일 보고서\n..."}
+{"date": "2026-10-02", "source": "template", "error": "RuntimeError: OPENAI_API_KEY 없음", "elapsed_s": 0.0,
+ "item_name": "토마토", "model_version": "production-v1", "drift_detected": false,
+ "markdown": "## 토마토 시세 일일 보고서\n- 내일 예측가: **3,926원/kg** (오늘 3,350원/kg, +17.2%)\n- 예측 모델: production-v1\n..."}
 ```
-(위는 잘못된 키로 실제 OpenAI 를 부른 테스트 응답. LLM 이 성공하면 `source: "llm"`, `error: null`, `markdown` 은 LLM 문장. `model_version` 은 PR #20 머지 후 `production-vN`)
+(위 `/predict` 1건 뒤 키 없이 생성한 실제 응답. LLM 이 성공하면 `source: "llm"`, `error: null`, `markdown` 은 `report_sidecar/prompts/report.md` 규칙으로 쓴 LLM 문장. 잘못된 키면 `error: "HTTPError: 401 ..."`)
 - `source: "template"` — LLM 실패(키 없음 · 30초 초과 · 오류) 시 같은 숫자로 만든 정해진 양식, `error` 에 사유
 - `drift_detected: true` 면 본문 첫 줄이 "가격 급변 감지 — 오늘 예측 신뢰도 낮음"
 - 404 `{"detail": "아직 생성된 보고서가 없습니다 (python -m report_sidecar.generator)"}`
@@ -166,9 +166,9 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 ## 이력 로그 한 줄 (`logs/history.jsonl`)
 
 ```json
-{"ts": "2026-10-01T17:01:20+09:00", "method": "POST", "path": "/predict", "status": 200,
- "latency_ms": 18.7, "model_version": "production-v4", "predicted": 167.86,
- "input_last": {"close": 167.2, "volume": 1200000}}
+{"ts": "2026-10-02T09:43:19+09:00", "method": "POST", "path": "/predict", "status": 200,
+ "latency_ms": 153.0, "model_version": "production-v1", "predicted": 3925.86,
+ "input_last": {"close": 3350.0, "volume": 159212}}
 ```
 - 422 처럼 라우터까지 못 간 요청은 `ts · method · path · status · latency_ms` 만
 - batch-test 는 `n_predictions` · `drift_status` 추가

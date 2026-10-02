@@ -255,7 +255,7 @@
   <section class="view" id="view-simulation">
     <div class="panel-grid">
       <section class="card section">
-        <div class="section-head"><div><h2>드리프트 시뮬레이션</h2><p class="help">토마토 일별 수익률 기반 정상 또는 폭염 배치를 <code>/predict/batch-test</code>로 전송합니다.</p></div></div>
+        <div class="section-head"><div><h2>드리프트 시뮬레이션</h2><p class="help">토마토 일별 수익률 기반 정상 또는 폭염 배치를 <code>/predict/batch-test</code>로 전송합니다. 최근 15건 WAPE가 18%를 넘으면 드리프트입니다.</p></div></div>
         <div class="btn-row">
           <button class="btn primary simulation-btn" onclick="sendBatch('normal')">정상 배치 전송</button>
           <button class="btn danger simulation-btn" onclick="sendBatch('drift')">폭염 배치 전송</button>
@@ -294,14 +294,15 @@
 <script>
 const SEQ_LEN = 25;
 const WINDOW_SIZE = 15;
-const RMSE_THRESHOLD = 612.0; // 원/kg (#45)
+const RMSE_THRESHOLD = 612.0; // 원/kg — 배포 게이트 (#45)
+const WAPE_THRESHOLD = 18.0; // % — 드리프트 기준, 최근 15건 (#105 · drift_detector.py)
 const NORMAL_SIGMA = 0.045247;
-const DRIFT_SIGMA = NORMAL_SIGMA * 4;
+const DRIFT_SIGMA = NORMAL_SIGMA * 8;
 const DEFAULT_BASE_PRICE = 3722.87;
 const RANDOM_SEED = 42;
 
 const PIPELINE_STAGES = [
-  ["수집", "요청 수신"], ["모니터링", "예측 기록"], ["감지", "RMSE 판정"],
+  ["수집", "요청 수신"], ["모니터링", "예측 기록"], ["감지", "WAPE 판정"],
   ["트리거", "재학습 시작"], ["학습", "fine-tuning"], ["등록", "MLflow"], ["배포", "Production"],
 ];
 let lastPipelineRun = null;
@@ -365,9 +366,12 @@ function parseAiopsLog(content) {
     const match = event.line.match(/new_rmse=([0-9.]+).*promoted:\s+(\S+)\s+v(\d+)/);
     return match ? [{ ...event, rmse: Number(match[1]), model: match[2], version: match[3] }] : [];
   });
+  const lastDriftLine = events.findLast((event) => event.line.includes("drift detected"))?.line;
+  const lastDriftWape = Number(lastDriftLine?.match(/wape=([0-9.]+)%/)?.[1] ?? NaN);
   const lastDrift = events.findLastIndex((event) => event.line.includes("drift detected"));
   const lastPromotion = events.findLastIndex((event) => event.line.includes("production promoted"));
-  return { events, promotions, driftActive: lastDrift >= 0 && lastDrift > lastPromotion };
+  return { events, promotions, driftActive: lastDrift >= 0 && lastDrift > lastPromotion,
+    lastDriftWape: Number.isFinite(lastDriftWape) ? lastDriftWape : null };
 }
 
 function renderMetrics(metrics) {
@@ -403,8 +407,10 @@ function renderLogs(state, report) {
   const drift = lastPipelineRun
     ? lastPipelineRun.driftCheck.status === "retrain_triggered"
     : state.events.length ? state.driftActive : report?.drift_detected;
-  if (drift === true) setMetric("metric-drift", "감지됨", "재학습 또는 승격 결과를 확인하세요", "warn");
-  else if (drift === false) setMetric("metric-drift", "정상", "활성 드리프트 없음", "ok");
+  const driftWape = lastPipelineRun ? lastPipelineRun.driftCheck.wape : state.lastDriftWape;
+  const wapeText = driftWape == null ? "" : `최근 15건 WAPE ${formatNumber(driftWape, 1)}% · `;
+  if (drift === true) setMetric("metric-drift", "감지됨", `${wapeText}기준 ${formatNumber(WAPE_THRESHOLD, 1)}% 초과`, "warn");
+  else if (drift === false) setMetric("metric-drift", "정상", `${wapeText}기준 ${formatNumber(WAPE_THRESHOLD, 1)}% 이하`, "ok");
   else setMetric("metric-drift", "데이터 없음", "로그와 보고서에 판정 기록이 없습니다");
 
   const history = document.getElementById("model-history");
@@ -518,10 +524,13 @@ function randomWalk(length, base, sigma, seed = RANDOM_SEED) {
     return Math.exp(logPrice);
   });
 }
-function rmseOf(actual, predicted) {
+function wapeOf(actual, predicted) {
+  // 서버 응답에 wape 가 없을 때만 쓰는 대체 계산 — drift_detector.compute_wape 와 같은 정의
   const length = Math.min(actual.length, predicted.length);
   if (!length) return null;
-  return Math.sqrt(actual.slice(0, length).reduce((sum, value, index) => sum + (value - predicted[index]) ** 2, 0) / length);
+  const actualSum = actual.slice(0, length).reduce((sum, value) => sum + value, 0);
+  const errorSum = actual.slice(0, length).reduce((sum, value, index) => sum + Math.abs(value - predicted[index]), 0);
+  return actualSum > 0 ? (errorSum / actualSum) * 100 : null;
 }
 
 async function sendBatch(kind) {
@@ -536,11 +545,11 @@ async function sendBatch(kind) {
     const data = await safeJson(response);
     if (!response.ok) throw Object.assign(new Error(data.detail || data.__raw || `HTTP ${response.status}`), { data });
     const actual = prices.slice(SEQ_LEN);
-    const clientRmse = rmseOf(actual, data.predictions || []);
+    const wape = data.drift_check?.wape ?? wapeOf(actual, data.predictions || []);
     lastPipelineRun = { driftCheck: data.drift_check || {}, timestamp: new Date().toISOString() };
     const check = lastPipelineRun.driftCheck;
     const message = check.promoted ? "재학습 완료 · Production 승격" : check.status === "retrain_triggered" ? "드리프트 감지 · 재학습 완료, 게이트 미통과" : "정상 · 드리프트 없음";
-    setStatus("drift-status", `${message} · 클라이언트 RMSE ${formatNumber(clientRmse, 2)}원/kg`, check.promoted ? "ok" : check.status === "retrain_triggered" ? "warn" : "ok");
+    setStatus("drift-status", `${message} · 최근 15건 WAPE ${formatNumber(wape, 2)}% (기준 ${formatNumber(WAPE_THRESHOLD, 1)}%)`, check.promoted ? "ok" : check.status === "retrain_triggered" ? "warn" : "ok");
     showResult("drift-result", data);
     await refreshDashboard();
   } catch (error) {

@@ -3,10 +3,10 @@ Day3 드리프트 감지 시뮬레이션 (119~123번 슬라이드).
 
 핵심 프로세스:
     1) 기준 통계 산출   - 저장소의 토마토 3년치 가격으로 평균·일별 로그수익률 변동성 계산
-    2) 정상 입력 테스트 - 평온 구간 변동성의 데이터로 예측 -> RMSE 임계값 이내 확인
-    3) 폭염 데이터 생성 - 변동성을 인위적으로 4배 키운 가격 데이터 생성
+    2) 정상 입력 테스트 - 평온 구간 변동성의 데이터로 예측 -> 최근 15건 WAPE 18% 이내 확인
+    3) 폭염 데이터 생성 - 변동성을 인위적으로 8배 키운 가격 데이터 생성
     4) 드리프트 데이터 주입 - 생성한 데이터를 서빙 서버에 연속 요청으로 전송
-    5) 결과 관찰       - RMSE 상승 -> 알림 로그 발생 -> 재학습 트리거 확인
+    5) 결과 관찰       - WAPE 상승 -> 알림 로그 발생 -> 재학습 트리거 확인
 
 사전 준비: 서빙 서버가 이미 떠 있어야 합니다. 이 스크립트는 서버 "밖"(호스트 터미널, 프로젝트 루트)에서
           실행하는 외부 클라이언트입니다.
@@ -59,7 +59,9 @@ BATCH_N = 40
 # 만들고, 그 수익률의 표준편차(변동성)만 다르게 줍니다.
 DEFAULT_BASE_PRICE = 3722.87  # data/tomato_prices.csv 903거래일 평균 (원/kg)
 NORMAL_SIGMA = 0.045247  # 평온 구간(2025-03-28부터 40거래일) 로그수익률 표준편차
-DRIFT_SIGMA = NORMAL_SIGMA * 4  # 시드 42 실측 RMSE 713.86원/kg > 드리프트 기준 612
+# 시드 42 실측 15건 WAPE: σ×1 6.0% · σ×4 11.1% · σ×8 20.8% > 드리프트 기준 18% (#106)
+# 대시보드(index.html)는 난수 생성기가 달라 σ×8 이 67.3% · σ×1 이 6.2% — 둘 다 같은 판정
+DRIFT_SIGMA = NORMAL_SIGMA * 8
 RANDOM_SEED = 42
 
 
@@ -74,7 +76,7 @@ def generate_normal_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=NORMAL_SIGMA
 
 
 def generate_drift_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=DRIFT_SIGMA):
-    """변동성을 4배 키운 폭염 입력 (의도적으로 오차 유발)."""
+    """변동성을 8배 키운 폭염 입력 (의도적으로 오차 유발)."""
     return _random_walk(n, base, sigma)
 
 
@@ -88,9 +90,10 @@ def send_batch(prices: np.ndarray, label: str) -> dict:
 
 
 def _summary(check: dict) -> str:
+    wape = f"wape={check['wape']:.2f}%" if "wape" in check else "wape=?"
     if check.get("status") != "retrain_triggered":
-        return check.get("status", "?")
-    return f"retrain_triggered (promoted={check.get('promoted')}, rmse={check.get('rmse', 0):.2f})"
+        return f"{check.get('status', '?')} ({wape})"
+    return f"retrain_triggered ({wape}, promoted={check.get('promoted')}, rmse={check.get('rmse', 0):.2f})"
 
 
 def main():

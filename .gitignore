@@ -7,9 +7,15 @@ __pycache__/
 .ipynb_checkpoints/
 .ruff_cache/
 
-# 가상환경 (교수님 스켈레톤 venv 이름 aiops 포함)
+# 가상환경 — 제출 금지 (교수님 스켈레톤 venv 이름 aiops 포함). 이름이 달라도 CI 가 pyvenv.cfg · site-packages 로 막는다
 .venv/
+.venv*/
+venv/
+env/
+ENV/
 aiops/
+pyvenv.cfg
+site-packages/
 
 # 환경변수 / API 키
 .env

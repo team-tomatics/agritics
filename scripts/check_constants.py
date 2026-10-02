@@ -28,14 +28,17 @@ GROUPS = {
         ("serving_app/monitoring/drift_detector.py", rf"^WINDOW_SIZE = {NUM}"),
         (HTML, rf"const WINDOW_SIZE = {NUM}"),
     ],
-    "RMSE 임계값 (드리프트 판정)": [  # 배포 게이트는 #104 부터 WAPE_GATE
-        ("serving_app/monitoring/drift_detector.py", rf"^RMSE_THRESHOLD = {NUM}"),
+    # 배포 게이트는 RMSE 유지 (교수님 안내 — 모델 선정 · 배포 판정 = RMSE). #104 첫 구현에서 RMSE_GATE 가 빠져
+    # 되돌릴 때까지 train_and_register 는 선택. drift_detector 는 WAPE 로 바뀌면 RMSE_THRESHOLD 가 없어질 수 있어 선택
+    "RMSE 게이트 (배포)": [
+        ("serving_app/train_and_register.py", rf"^RMSE_GATE = {NUM}", False),
+        ("serving_app/monitoring/drift_detector.py", rf"^RMSE_THRESHOLD = {NUM}", False),
         (HTML, rf"const RMSE_THRESHOLD = {NUM}"),
     ],
-    # #102 MAE · WAPE 게이트 — C(train_and_register) · D(index.html) 가 상수를 붙이는 대로 같이 검사, 없으면 건너뜀
-    "WAPE 게이트 WAPE_GATE (%)": [
-        ("serving_app/train_and_register.py", rf"^WAPE_GATE = {NUM}", False),
-        (HTML, rf"const WAPE_GATE = {NUM}", False),
+    # #102 드리프트 = 최근 15건 WAPE > X% — D 가 상수를 붙이는 대로 같이 검사, 없으면 건너뜀
+    "드리프트 WAPE_THRESHOLD (%)": [
+        ("serving_app/monitoring/drift_detector.py", rf"^WAPE_THRESHOLD = {NUM}", False),
+        (HTML, rf"const WAPE_THRESHOLD = {NUM}", False),
     ],
     "모델 이름": [
         ("serving_app/train_and_register.py", r'^MODEL_NAME = "(\w+)"'),

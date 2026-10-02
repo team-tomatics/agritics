@@ -1,12 +1,13 @@
 """
-게이트 지표 비교 — RMSE · MAE · MAPE · WAPE 를 모델 · 단순 예측 · 재학습 모델로 한 번에 (#102 게이트 결정 · 검증용)
+게이트 지표 비교 — RMSE · MAE · MAPE · WAPE · Bias 를 모델 · 단순 예측 · 재학습 모델로 한 번에 (#102 검증용)
 
 작성자: 박유진
 버전: v1.1.0 (2026-10-02)
 변경 이력:
   v1.0.0  #102  RMSE · MAPE 비교 (게이트 시험 구간 · 재학습 채점 구간)
-  v1.1.0  #102  MAE · WAPE 추가 · 명절 구간 오차 비중 · 게이트(WAPE) · 회귀 테스트(MAE) 판정 — 교수님 권고
-                 "명절 등 물량 변동 구간 포함 평가 → MAE + WAPE (특정 구간이 수치를 지배하지 않음)"
+  v1.1.0  #102  교수님 안내(케이스별 권장 지표)대로 — 배포 판정 · 회귀 테스트 = RMSE (현행) ·
+                 명절 구간 포함 평가 = MAE + WAPE (명절 구간 오차 비중) · 품절 · 재고 방향 = Bias
+                 (드리프트 = WAPE 는 scripts/drift_wape_threshold.py)
 
 프로젝트 루트에서 (mlflow.db · scaler.pkl 이 있어야 함 — train_baseline_v1 · train_and_register 실행 후)
     python scripts/gate_metrics.py                         # data/tomato_prices.csv 기준
@@ -18,7 +19,7 @@
   3) 재학습 채점 구간 (마지막 RETRAIN_DAYS + SEQ_LEN 행의 시험 20%) — fine_tune 이 받는 점수
      · 현재 Production · 가장 최근 fine-tune 실행 모델(탈락했어도 MLflow 에 남아 있음) · 단순 예측
   명절 비중 = 설 · 추석 14일 전 ~ 7일 후가 제곱 오차(RMSE) · 절대 오차(MAE · WAPE) 에서 차지하는 몫
-  게이트 값은 train_and_register 의 WAPE_GATE (C) — 아직 없으면 제안값 15% 로 표시
+  Bias = Σ(예측 − 실제) / Σ실제 — 음수 과소예측(값이 실제보다 낮음 → 구매 부족) · 양수 과대예측
 """
 import argparse
 import math
@@ -49,7 +50,10 @@ def wape(y, p):
     return 100 * sum(abs(a - b) for a, b in zip(y, p)) / sum(y)
 
 
-WAPE_GATE_PROPOSAL = 15.0  # % — 시드 5개 첫 배포 WAPE 10.4 ~ 12.9% (scripts/seed_metrics.py) 에 여유. C 상수 생기면 그 값을 쓴다
+def bias(y, p):
+    """% — Σ(예측 − 실제) / Σ실제. 음수 = 과소예측, 양수 = 과대예측."""
+    return 100 * sum(b - a for a, b in zip(y, p)) / sum(y)
+
 
 # 명절 물량 변동 구간 = 설 · 추석 14일 전 ~ 7일 후 (도매가는 명절 전 반입 · 수요가 몰릴 때 뛴다)
 HOLIDAYS = ["2023-09-29", "2024-02-10", "2024-09-17", "2025-01-29", "2025-10-06", "2026-02-17", "2026-09-25"]
@@ -91,11 +95,12 @@ def _window(rows, scaler, model):
 
 
 def _line(label, y, p, gate=None):
-    """gate = WAPE 게이트(%) 면 판정을 붙인다 (회귀 테스트는 따로 — [3] 에서 Production 과 MAE 비교)."""
-    w = wape(y, p)
-    line = f"  {label:<24} RMSE {rmse(y, p):7.1f} · MAE {mae(y, p):7.1f}원/kg · MAPE {mape(y, p):5.1f}% · WAPE {w:5.1f}%"
+    """gate = RMSE 게이트(원/kg) 면 판정을 붙인다 (회귀 테스트는 따로 — [3] 에서 Production 과 RMSE 비교)."""
+    r = rmse(y, p)
+    line = (f"  {label:<24} RMSE {r:7.1f} · MAE {mae(y, p):7.1f}원/kg · MAPE {mape(y, p):5.1f}% · "
+            f"WAPE {wape(y, p):5.1f}% · Bias {bias(y, p):+5.1f}%")
     if gate:
-        line += "  게이트 " + ("통과" if w <= gate else "탈락")
+        line += "  게이트 " + ("통과" if r <= gate else "탈락")
     return line
 
 
@@ -116,10 +121,10 @@ def main():
     rows = load_rows(a.csv)
     scaler = PriceVolumeScaler.load(SCALER_PATH)
     closes = [r["Close"] for r in rows]
-    gate = getattr(tr, "WAPE_GATE", WAPE_GATE_PROPOSAL)
+    gate = getattr(tr, "RMSE_GATE", None)
     print(f"데이터 {a.csv} · {len(rows)}행 ({rows[0]['Date']} ~ {rows[-1]['Date']})")
-    print(f"게이트 WAPE ≤ {gate:.0f}%{'' if hasattr(tr, 'WAPE_GATE') else ' (제안값 — train_and_register 에 WAPE_GATE 없음)'}"
-          f" · 재학습은 회귀 테스트(MAE ≤ 현재 Production)도\n")
+    print(f"게이트 RMSE ≤ {gate:.0f}원/kg" if gate else "게이트 판정 생략 — train_and_register 에 RMSE_GATE 없음",
+          "· 재학습은 회귀 테스트(RMSE ≤ 현재 Production)도 — MAE · WAPE · Bias 는 평가용\n")
 
     print("[1] 전체 기간 단순 예측 (평시 기준선)")
     print(_line("단순 예측 내일 = 오늘", closes[1:], closes[:-1]))
@@ -143,9 +148,10 @@ def main():
         ft = mlflow.tensorflow.load_model(f"runs:/{runs[0].info.run_id}/model")
         _, _, ft_pred, _, _ = _window(recent, scaler, ft)
         print(_line("최근 fine-tune 모델", y, ft_pred, gate))
-        print(f"  회귀 테스트 MAE {mae(y, ft_pred):.1f} vs Production {mae(y, pred):.1f} → "
-              f"{'통과' if mae(y, ft_pred) <= mae(y, pred) else '탈락'}"
-              f"  (RMSE 로 비교하면 {'통과' if rmse(y, ft_pred) <= rmse(y, pred) else '탈락'})")
+        print(f"  회귀 테스트 RMSE {rmse(y, ft_pred):.1f} vs Production {rmse(y, pred):.1f} → "
+              f"{'통과' if rmse(y, ft_pred) <= rmse(y, pred) else '탈락'}"
+              f"  (명절 구간 평가 MAE {mae(y, ft_pred):.1f} vs {mae(y, pred):.1f} — "
+              f"{'나아짐' if mae(y, ft_pred) <= mae(y, pred) else '나빠짐'})")
     else:
         print("  (fine-tune 실행 기록 없음 — 드리프트 재학습을 한 번 돌린 뒤 다시 실행)")
     print(_line("단순 예측", y, naive, gate))

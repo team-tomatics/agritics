@@ -1,16 +1,10 @@
 """
-[소유: B 서빙 · 박유진]  모델 불러오기 — local / MLflow · Lazy / Eager
+모델 불러오기 — local / MLflow · Lazy / Eager
 
-작성자 : 교수님 스켈레톤(원본) · 팀 변경 박유진 (B 서빙 · Git)
-버전   : 0.4.0
-작성일 : 2026-10-01
-변경 이력
-  0.1.0  2026-10-01  원본: 교수님 스켈레톤 (빈칸 채운 배포본)
-  0.2.0  2026-10-01  모델 이름 Tomato_Price_Predictor (#11 · 황재원)
-  0.3.0  2026-10-01  model_version 에 MLflow 버전 번호 production-vN (#20)
-  0.4.0  2026-10-02  PriceVolumeScaler · tomato_v1.keras · 원/kg 주석 (#75)
+작성자: 박유진 (원본: 교수님 스켈레톤)
+버전: v0.4.0 (2026-10-02)
+변경: #11 모델 이름(황재원) · #20 버전 표시 · #75 PriceVolumeScaler·tomato_v1
 
-── 원본 설명 (교수님 스켈레톤) ──
 [Day1 → Day2] 모델 불러오기  —  serving_app/model_loader.py
 【실습용】 ___ (밑줄 3개)만 채우세요. 채울 곳은 [빈칸 N] 으로 표시되어 있습니다.
    ___ 가 남은 채 실행하면 "name '___' is not defined" 에러가 나며, 그 줄이 채울 곳입니다.

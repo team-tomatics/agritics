@@ -139,7 +139,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | RMSE 임계값 ✔ | 4.00 ($) | **612원/kg** ✅ #45 1단계 (동적 게이트는 EarlyStopping 실험 후 결정) | 전원 (10/2 합의) | `train_and_register.py` `RMSE_GATE` · `drift_detector.py` `RMSE_THRESHOLD` · `index.html` `const RMSE_THRESHOLD` |
 | 모델 이름 ✔ | `HAIC_Predictor` | `Tomato_Price_Predictor` (= `items.yaml` `model_name`) | C | `train_and_register.py:38` · `model_loader.py:40` `MLFLOW_MODEL_URI` · `retrain_trigger.py:90` 로그 문구 |
 | 시나리오 기준 가격 | 165.0 | 3,727 (3년 평균) | A 데이터로 D 가 | `simulate_drift.py:75,80` `base=` · `index.html` `DEFAULT_BASE_PRICE` |
-| 변동성 | 0.012 / ×3 | **팀 결정** (토마토 일변동) | A 데이터로 D 가 | `simulate_drift.py:66-67` · `index.html` `NORMAL_SIGMA` `DRIFT_SIGMA` |
+| 변동성 · 시드 | 0.012 / ×3 | **0.045247 / ×3 · seed 42** (평온 구간 2025-03-28부터 40거래일) | A 데이터로 D 가 | `simulate_drift.py` · `index.html` `NORMAL_SIGMA` `DRIFT_SIGMA` `RANDOM_SEED` |
 | 시드 CSV | `sample_haic_prices.csv` | `tomato_prices.csv` ✅ 반입량 포함(#40) · Dockerfile · 시뮬레이터 교체 #45 | A 파일 · C 교체 | `Dockerfile:28` · `simulate_drift.py:42` `SAMPLE_CSV` · 안내 문구(`storage.py` · `index.html`) |
 | 열 · 필드 이름 | `Close` / `Volume` | **팀 결정** — 수준 1(그대로, 의미만 재정의) / 수준 2(이름까지) | 전원 | CSV · `features.py` · `schemas.py` · `routers/data.py` · `model_loader.py` · `routers/predict.py` |
 

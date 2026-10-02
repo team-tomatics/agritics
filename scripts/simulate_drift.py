@@ -3,7 +3,7 @@ Day3 드리프트 감지 시뮬레이션 (119~123번 슬라이드).
 
 핵심 프로세스:
     1) 기준 통계 산출   - 토마토 3년치 가격의 평균·일별 로그수익률 변동성 계산
-    2) 정상 입력 테스트 - 같은 분포의 데이터로 예측 -> RMSE 임계값 이내 확인
+    2) 정상 입력 테스트 - 평온 구간 변동성의 데이터로 예측 -> RMSE 임계값 이내 확인
     3) 폭염 데이터 생성 - 변동성을 인위적으로 3배 키운 가격 데이터 생성
     4) 드리프트 데이터 주입 - 생성한 데이터를 서빙 서버에 연속 요청으로 전송
     5) 결과 관찰       - RMSE 상승 -> 알림 로그 발생 -> 재학습 트리거 확인
@@ -64,17 +64,18 @@ BATCH_N = 40
 # 납니다. 그래서 정상/드리프트 배치 모두 일별 수익률(log return) 기반의 랜덤워크로
 # 만들고, 그 수익률의 표준편차(변동성)만 다르게 줍니다.
 DEFAULT_BASE_PRICE = 3722.87  # data/tomato_prices.csv 903거래일 평균 (원/kg)
-NORMAL_SIGMA = 0.121260  # 같은 데이터의 일별 로그수익률 표준편차
+NORMAL_SIGMA = 0.045247  # 평온 구간(2025-03-28부터 40거래일) 로그수익률 표준편차
 DRIFT_SIGMA = NORMAL_SIGMA * 3  # 폭염 급등락을 재현하는 3배 변동성
+RANDOM_SEED = 42
 
 
-def _random_walk(n: int, base: float, sigma: float) -> np.ndarray:
-    log_returns = np.random.normal(0, sigma, n)
+def _random_walk(n: int, base: float, sigma: float, seed: int = RANDOM_SEED) -> np.ndarray:
+    log_returns = np.random.default_rng(seed).normal(0, sigma, n)
     return base * np.exp(np.cumsum(log_returns))
 
 
 def generate_normal_batch(n=BATCH_N, base=DEFAULT_BASE_PRICE, sigma=NORMAL_SIGMA):
-    """학습 데이터와 비슷한 변동성의 정상 입력(랜덤워크)."""
+    """평온 구간과 같은 변동성의 정상 입력(랜덤워크)."""
     return _random_walk(n, base, sigma)
 
 
@@ -107,11 +108,11 @@ def main():
     targets = ["local", "container"] if args.target == "both" else [args.target]
 
     mean, sigma = compute_baseline_stats()
-    print(f"[1] 토마토 기준 통계: mean={mean:.2f}원/kg, log_return_sigma={sigma:.6f}")
+    print(f"[1] 토마토 기준 통계: mean={mean:.2f}원/kg, 전체_sigma={sigma:.6f}, 평온_sigma={NORMAL_SIGMA:.6f}")
 
     # 배치는 한 번만 만든다: 두 서버에 "똑같은" 입력을 보내야 결과를 공정하게 비교할 수 있다.
-    normal_batch = generate_normal_batch(base=mean, sigma=sigma)
-    drift_batch = generate_drift_batch(base=mean, sigma=sigma * 3)
+    normal_batch = generate_normal_batch(base=mean)
+    drift_batch = generate_drift_batch(base=mean)
 
     results = {}
     for name in targets:

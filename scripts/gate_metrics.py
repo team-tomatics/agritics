@@ -121,10 +121,9 @@ def main():
     rows = load_rows(a.csv)
     scaler = PriceVolumeScaler.load(SCALER_PATH)
     closes = [r["Close"] for r in rows]
-    gate = getattr(tr, "RMSE_GATE", None)
+    gate = tr.RMSE_GATE
     print(f"데이터 {a.csv} · {len(rows)}행 ({rows[0]['Date']} ~ {rows[-1]['Date']})")
-    print(f"게이트 RMSE ≤ {gate:.0f}원/kg" if gate else "게이트 판정 생략 — train_and_register 에 RMSE_GATE 없음",
-          "· 재학습은 회귀 테스트(RMSE ≤ 현재 Production)도 — MAE · WAPE · Bias 는 평가용\n")
+    print(f"게이트 RMSE ≤ {gate:.0f}원/kg · 재학습은 회귀 테스트(RMSE ≤ 현재 Production)도 — MAE · WAPE · Bias 는 평가용\n")
 
     print("[1] 전체 기간 단순 예측 (평시 기준선)")
     print(_line("단순 예측 내일 = 오늘", closes[1:], closes[:-1]))

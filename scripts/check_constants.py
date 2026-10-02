@@ -28,10 +28,10 @@ GROUPS = {
         ("serving_app/monitoring/drift_detector.py", rf"^WINDOW_SIZE = {NUM}"),
         (HTML, rf"const WINDOW_SIZE = {NUM}"),
     ],
-    # 배포 게이트는 RMSE 유지 (교수님 안내 — 모델 선정 · 배포 판정 = RMSE). #104 첫 구현에서 RMSE_GATE 가 빠져
-    # 되돌릴 때까지 train_and_register 는 선택. drift_detector 는 WAPE 로 바뀌면 RMSE_THRESHOLD 가 없어질 수 있어 선택
+    # 배포 게이트는 RMSE 유지 (교수님 안내 — 모델 선정 · 배포 판정 = RMSE).
+    # drift_detector 는 WAPE 로 바뀌면 RMSE_THRESHOLD 가 없어질 수 있어 선택
     "RMSE 게이트 (배포)": [
-        ("serving_app/train_and_register.py", rf"^RMSE_GATE = {NUM}", False),
+        ("serving_app/train_and_register.py", rf"^RMSE_GATE = {NUM}"),
         ("serving_app/monitoring/drift_detector.py", rf"^RMSE_THRESHOLD = {NUM}", False),
         (HTML, rf"const RMSE_THRESHOLD = {NUM}"),
     ],

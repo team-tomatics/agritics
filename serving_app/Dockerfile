@@ -1,11 +1,12 @@
 # 서빙 앱 컨테이너 이미지
 #
 # 작성자: 황재원 (원본: 교수님 스켈레톤)
-# 버전: v0.3.0 (2026-10-02)
+# 버전: v0.4.0 (2026-10-02)
 # 변경 이력:
 #   v0.1.0  —    교수님 스켈레톤 원본
 #   v0.2.0  #57  빌드 시드 CSV tomato_prices.csv (박유진)
 #   v0.3.0  #75  HAIC 문구 · 이미지 이름 정리 (박유진)
+#   v0.4.0  #85  TZ=KST-9 — 로그 시각 KST
 #
 # Day2: 농수산물 시세 예보 서빙 앱 컨테이너 이미지 (토마토 시드로 빌드 때 학습)
 # 빌드/실행은 반드시 프로젝트 루트에서: docker build -f serving_app/Dockerfile -t agritics-serving:v2 .
@@ -21,6 +22,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # fastapi, uvicorn, mlflow, tensorflow, python-multipart(파일 업로드) 포함
+
+# 컨테이너 시각을 KST 로 (aiops.log · 대시보드 · 보고서가 같은 시간대, #85).
+# slim 이미지엔 tzdata 가 없어 Asia/Seoul 대신 POSIX 형식 KST-9 (= UTC+9)
+ENV TZ=KST-9
 
 COPY serving_app/ serving_app/
 COPY data/ data/

@@ -2,7 +2,7 @@
 예측 API — POST /predict · /predict/batch-test
 
 작성자: 박유진 (원본: 교수님 스켈레톤)
-버전: v0.6.0 (2026-10-02)
+버전: v0.6.1 (2026-10-03)
 변경 이력:
   v0.1.0  —    교수님 스켈레톤 원본 (빈칸 채운 배포본)
   v0.2.0  #4   이력 로그용 request.state.history
@@ -10,6 +10,7 @@
   v0.4.0  #58  batch-test 반입량 = 업로드 중앙값 (#49)
   v0.5.0  #75  주석 토마토 · 원/kg 기준
   v0.6.0  #84  Swagger 설명 토마토 실측 · batch-test 예측값 반올림
+  v0.6.1  #109 주석 — 드리프트 판정 최근 15건 WAPE > 18% (#105, 배포 게이트는 RMSE 612 그대로)
 
 [Day1 → Day3] 예측 API  —  serving_app/routers/predict.py
 【실습용】 ___ (밑줄 3개)만 채우세요. 채울 곳은 [빈칸 N] 으로 표시되어 있습니다.
@@ -81,7 +82,7 @@ def batch_test(req: BatchTestRequest, request: Request):
     """
     [Day3] 드리프트 시뮬레이션
     받는 것  : {"prices": [2833.0, 2850.0, ... 40개]}   (원/kg, scripts/simulate_drift.py 가 보냄)
-    돌려줄 것: {"predictions": [예측값 15개], "drift_check": {"status": "ok"} 또는 재학습 결과}
+    돌려줄 것: {"predictions": [예측값 15개], "drift_check": {"status": "ok", "wape": 15.3} 또는 재학습 결과}
                반입량은 최근 업로드 CSV 의 중앙값으로 채운다 (#49)
 
     ■ 핵심 아이디어: 슬라이딩 윈도우 (25칸짜리 창문을 한 칸씩 밀기)
@@ -91,12 +92,13 @@ def batch_test(req: BatchTestRequest, request: Request):
         i=1 : [p1  ~ p25] → 예측   vs  실제 p26
         ...
         i=14: [p14 ~ p38] → 예측   vs  실제 p39
-        → 총 40 - 25 = 15번 예측 = 드리프트 판단에 필요한 15건이 딱 채워집니다 (612원/kg 기준).
+        → 총 40 - 25 = 15번 예측 = 드리프트 판단에 필요한 15건이 딱 채워집니다 (최근 15건 WAPE > 18% 면 드리프트).
 
     확인 방법
       python scripts/simulate_drift.py
-        [normal]          drift_check = {'status': 'ok'}
-        [drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True 또는 False, 'rmse': ...}
+        [normal]          drift_check = {'status': 'ok', 'wape': 6.01}
+        [drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True 또는 False, 'rmse': ..., 'wape': 20.81}
+        (wape = 판정에 쓴 최근 15건 WAPE %, rmse = 재학습한 새 모델의 RMSE — 게이트 612원/kg 와 비교)
       /docs 에서 직접 호출할 때는 predictions 가 (가격 개수 - 25)개인지 확인하세요.
     """
     model = model_loader.get_model()
@@ -112,12 +114,12 @@ def batch_test(req: BatchTestRequest, request: Request):
         #   생각해 볼 질문
         #     · 파이썬 슬라이싱 prices[a:b] 는 b 를 포함하나요?
         #     · 실제 값을 한 칸 앞(창문의 마지막 날)으로 잡으면, 모델은 무엇을 "맞힌" 셈이 될까요?
-        #     · 반대로 창문을 한 칸 더 길게 잡아서 실제 값이 창문 안에 들어가면 RMSE는 어떻게 될까요?
+        #     · 반대로 창문을 한 칸 더 길게 잡아서 실제 값이 창문 안에 들어가면 오차(WAPE)는 어떻게 될까요?
         window = prices[i : i + SEQ_LEN]
         sequence = [{"close": p, "volume": volume} for p in window]
         pred = model.predict_one(sequence)
         actual = prices[i + SEQ_LEN]
-        predictions.append(round(pred, 2))  # /predict 와 같은 소수 둘째 자리 (드리프트 RMSE 는 원값 recent_predictions 로 계산)
+        predictions.append(round(pred, 2))  # /predict 와 같은 소수 둘째 자리 (드리프트 WAPE 는 원값 recent_predictions 로 계산)
         recent_predictions.append({"predicted": pred, "actual": actual})
 
     # 최근 WINDOW_SIZE(15)건만 남기기 — 오래된 기록까지 섞이면 "지금" 상태를 판단할 수 없습니다.

@@ -2,7 +2,7 @@
 
 > 소유: B 서빙 · 박유진 (`/data/*` 는 A 심준용, `/logs` 는 D 민영은 파일 — 동작이 바뀌면 소유자가 이 문서도 고친다)
 > 기준: 입력 25거래일 · 판정 윈도우 15건 (기획서 3-6). Swagger: `http://localhost:8077/docs` (컨테이너 `8099`)
-> 예시 값은 토마토 데이터(`data/tomato_prices.csv` 903거래일 · 반입량 포함)로 학습한 Production 모델(RMSE 540.04)에 실제로 보낸 응답이다 (10/2).
+> 예시 값은 토마토 데이터(`data/tomato_prices.csv` 903거래일 · 반입량 포함)로 학습한 Production 모델(RMSE 540.04)에 실제로 보낸 응답이다 (10/2) · batch-test · aiops.log 는 10/3 main (드리프트 WAPE 18%).
 
 ## 한눈에
 
@@ -57,26 +57,30 @@
 
 ## POST /predict/batch-test
 
-드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, 최근 15건 RMSE 가 612원/kg 을 넘으면 드리프트로 판정한다. 반입량은 최근 업로드 CSV 의 중앙값(토마토 136,449kg, #49).
+드리프트 시뮬레이션용. 가격 `SEQ_LEN + N` 개를 보내면 25칸 창을 한 칸씩 밀며 N 번 예측하고, **최근 15건 WAPE(오차 합 ÷ 가격 합) > 18%** 면 드리프트로 판정한다 (#105 · 기획서 3-2). 배포 게이트는 그대로 RMSE ≤ 612원/kg. 반입량은 최근 업로드 CSV 의 중앙값(토마토 136,449kg, #49).
 
 요청 (보통 40개 = 25 + 15, `scripts/simulate_drift.py`)
 ```json
 {"prices": [2833.0, 2850.0, 2920.0, ... 40개]}
 ```
-응답 200 — 평온 구간 (실제 2025-03-28 ~ 05-13 40거래일)
+응답 200 — 드리프트 아님. `wape` 는 판정에 쓴 최근 15건 WAPE(%)
 ```json
-{"predictions": [2539.5, 2492.9, 2439.9, ... 15개],
- "drift_check": {"status": "ok"}}
+{"predictions": [...15개], "drift_check": {"status": "ok", "wape": 15.3}}
 ```
-드리프트면 그 자리에서 재학습(최근 25 + 25 = 50행 fine-tuning) → 게이트(612원/kg) · 회귀 테스트 → 통과하면 승격. 아래는 실제 2026-08-13 ~ 09-30 급등 구간 — 재학습한 모델도 게이트를 못 넘어 **기존 Production 유지**
+위는 **실제 추석 급등(2026-08-13 ~ 09-30)** — 가격은 크게 뛰었지만 모델이 비율로는 따라가 드리프트가 아니다. RMSE 기준(612원/kg)이었다면 금액 오차가 커져 드리프트로 판정됐을 구간이다.
+
+드리프트면 그 자리에서 재학습(최근 업로드 CSV 마지막 25 + 25 = 50행 fine-tuning) → 게이트(RMSE ≤ 612) · 회귀 테스트(RMSE ≤ 현재 Production) → 통과하면 승격.
 ```json
-{"predictions": [4230.1, 4628.2, 4998.2, ... 15개],
- "drift_check": {"status": "retrain_triggered", "promoted": false, "rmse": 1258.41}}
+{"drift_check": {"status": "retrain_triggered", "promoted": false, "rmse": 1258.41, "wape": 20.81}}
 ```
-통과하면 `"promoted": true` 와 새 `"rmse"` · 다음 `/predict` 의 `model_version` 이 `production-v2` 로 바뀐다
-(10/2 토마토 Production 모델 실측)
-- 승격되면 서버 모델 캐시를 비워 **다음 `/predict` 부터 새 버전**으로 응답한다 (기획서 3-4)
-- 재학습은 요청 안에서 동기로 돈다 (약 8초) — 기획서 3-4 #8 한계
+위는 **폭염 시나리오**(`simulate_drift.py`, 전체 데이터 업로드 상태) — 재학습 모델 RMSE 1,258.41 이 게이트를 못 넘어 **기존 Production 유지**. 실제 평온 구간(2025-03-28 ~ 05-13)도 WAPE 19.84% 로 드리프트 → 같은 재학습 결과로 유지된다 (가격이 거의 안 움직일 때 모델이 평균 쪽으로 끌리는 성능 저하, 기획서 3-6).
+```json
+{"drift_check": {"status": "retrain_triggered", "promoted": true, "rmse": 490.56, "wape": 20.91}}
+```
+위는 **2026-07-30 까지 자른 CSV 를 업로드한 뒤** 같은 폭염 시나리오 — 재학습 데이터가 급등 전 구간이라 게이트 · 회귀 테스트를 통과해 v2 승격, 다음 `/predict` 는 `{"predicted_close": 3566.78, "model_version": "production-v2"}` (README "시연 순서")
+(10/3 main 컨테이너 실측)
+- 승격되면 서버 모델 캐시를 비워 **다음 `/predict` 부터 새 버전**으로 응답하고, 판정 윈도우를 비운다 (#74)
+- 재학습은 요청 안에서 동기로 돈다 (약 5~8초) — 기획서 3-4 #8 한계
 
 ## GET /health
 
@@ -161,7 +165,14 @@ LLM 사이드카(`python -m report_sidecar.generator --at 06:00`)가 **매일 06
 ```json
 {"name": "aiops.log", "content": "2026-10-01 17:01:04,... [WARNING] [WARN] drift detected - triggering retrain\n..."}
 ```
-`aiops.log` 순서: `[WARN] drift detected - triggering retrain` → `[INFO] retrain triggered (window=last_25_days)` → 승격하면 `[OK] new_rmse=... - production promoted: Tomato_Price_Predictor vN`, 게이트 · 회귀 테스트에서 떨어지면 `[FAIL] new_rmse=... - gate/regression failed, keep current Production`.
+`aiops.log` 순서 (10/3 실측):
+```
+[WARN] drift detected - triggering retrain (wape=20.91%)
+[INFO] retrain triggered (window=last_25_days)
+[OK] new_rmse=490.56 - production promoted: Tomato_Price_Predictor v2 (mae=367.7 wape=18.5% bias=-3.5%)
+[FAIL] new_rmse=1258.41 - gate/regression failed, keep current Production (mae=1055.5 wape=24.4% bias=+4.0%)
+```
+괄호 안 `mae` · `wape` · `bias` 는 재학습한 새 모델의 채점 결과(#104, 기록용 — 판정은 RMSE). `[WARN]` 의 `wape` 는 드리프트 판정값.
 컨테이너 빌드 중 최초 Production 등록도 같은 `[OK]` 형식으로 기록되므로 첫 기동부터 대시보드에 v1 RMSE와 승격 이력이 표시된다.
 
 ---

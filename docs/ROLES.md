@@ -22,7 +22,7 @@ cp .env.example .env
 .venv/bin/python scripts/train_baseline_v1.py                # 터미널 2 → scaler.pkl + tomato_v1.keras
 .venv/bin/python serving_app/train_and_register.py           # MLflow 등록 + [GATE PASSED]
 # 터미널 1 재시작: MODEL_SOURCE=mlflow LOADING_MODE=eager .venv/bin/uvicorn serving_app.main:app --port 8077
-.venv/bin/python scripts/simulate_drift.py                   # [WARN] → 재학습 → [OK]
+.venv/bin/python scripts/simulate_drift.py                   # [WARN] → 재학습 → [FAIL] (전체 데이터) · v2 승격은 README '시연 순서'
 
 # 컨테이너 (빌드 때 학습까지 끝남, 8099)
 docker compose -f serving_app/docker-compose.yml up --build
@@ -61,7 +61,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | **A** | 심준용 | 데이터 오너 | `data/*` · `routers/data.py` · `scripts/train_baseline_v1.py` · `scripts/fetch_*.py` · `config/items.yaml` · `report_sidecar/prompts/` | 입력 데이터 드리프트 — 가격 · 반입량 분포 (PSI · KS) | ① Pain Point · 업로드 · `/data/status` · 분포 비교 · 보고서 예시 |
 | **B** | 박유진 | 서빙 오너 (+ Git) | `schemas.py` · `model_loader.py` · `main.py` · `history_log.py` · `routers/predict.py` `health.py` `report.py` · `report_sidecar/generator.py` | 응답 지연 · 에러율 (P95 > 500ms · 5xx 에러율 > 1%) | ② 운영 목표 · ⑤ API 명세(/report 포함) · 지연 측정표 |
 | **C** | 황재원 | MLOps 오너 | `train_and_register.py` · `lstm_model.py` · `Dockerfile` · `docker-compose.yml` · `requirements.txt` · `report_sidecar/Dockerfile` | 모델 버전 관리 — 전환 · 실패 시 기존 유지 · 재학습 뒤 캐시 비우기 | ③ 게이트 절 · ④ 아키텍처 · MLflow 버전 전 · 후 · 컨테이너 기동 |
-| **D** | 민영은 | 모니터링 오너 | `monitoring/*` · `scripts/simulate_drift.py` · `static/index.html` · `routers/logs.py` · `report_sidecar/observe.py` | 예측 드리프트(21건 윈도우) + 생성형 출력 이상 | ③ 드리프트 대응 절 · 드리프트 → [WARN] → 재학습 → 보고서 라이브 데모 |
+| **D** | 민영은 | 모니터링 오너 | `monitoring/*` · `scripts/simulate_drift.py` · `static/index.html` · `routers/logs.py` · `report_sidecar/observe.py` | 예측 드리프트(최근 15건 WAPE > 18%) + 생성형 출력 이상 | ③ 드리프트 대응 절 · 드리프트 → [WARN] → 재학습 → 보고서 라이브 데모 |
 
 공용 (바꾸기 전에 슬랙): `.github/` · `.env.example` · `docs/` · `README.md` · `scripts/check_constants.py`
 
@@ -115,7 +115,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 
 | 할 일 | 파일 | 근거 |
 |---|---|---|
-| 드리프트 임계값 원/kg (공유 상수 — 게이트와 같은 값) | `drift_detector.py` · `index.html` | 3-2 |
+| 드리프트 임계값 — 최근 15건 WAPE 18% ✅ #105 (게이트 RMSE 612 와 별도) | `drift_detector.py` · `index.html` | 3-2 |
 | 폭염 시나리오 — 기준 가격 165 → 토마토 평균(3,727원/kg), 급등형 배치 | `simulate_drift.py` · `index.html` 복제 상수 | 3-3 |
 | 승격 시 판정 윈도우 초기화 (팀 결정) | `retrain_trigger.py` | 3-4 #7 |
 | P95 지연 > 500ms · 5xx 에러율 > 1% → `aiops.log` 경고 (B 의 `/metrics` · `summarize()` 사용, #31) | `monitoring/` | 3-2 |
